@@ -144,7 +144,7 @@ class SegmentedScene:
 
             #cid = [random.choice("ABCDEFGHIGJSDHS903R4IDFA34RAFDAFDLLAFD") for _ in range(4)] # this call makes me very nervous
             #cid = ''.join(cid)
-            cid = uuid.uuid4()
+            cid = str(uuid.uuid4()) # str so we can later link it to a soma2 object
             if(talk): print("randomly assigned temporary cid: " + str(cid))
             cur_cluster = SegmentedCluster(cid,root_cluster)
 

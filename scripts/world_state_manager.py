@@ -10,6 +10,9 @@ from soma_io.geometry import *
 from soma_io.state import World, Object
 from soma_io.geometry import Pose
 
+# SOMA2 stuff
+from soma2_msgs.msg import SOMA2Object
+from soma_manager.srv import *
 
 talk = False
 
@@ -178,25 +181,19 @@ class WorldStateManager:
                         if(talk): print("creating object")
                         cur_obj = self.world_model.create_object(cur_scene_cluster.cluster_id)
                         cur_obj._parent = self.get_cur_metaroom()
-                        #cur_room = self.world_model.get_object("base_room")
-                        #cur_room.add_child(self.cur_obj)
 
                     # from here we've either added this as a new object to the scene
                     # or retreived the data for it in a previous scene
 
                     if(cur_obj):
-
-
                         # so first add a new observation to it, in all cases
                         if(talk): print("making observation")
                         # add an observation for the object
-                        cloud_observation = Observation.make_observation_from_messages(
-                                   [("/tf", self.transform_store.pickle_to_msg()),
-                                     ("/head_xtion/depth_registered/points", cur_scene_cluster.cloud)])
+                        cloud_observation = Observation.make_observation()
+
                         cur_obj.add_observation(cloud_observation)
 
                         # centroid of this object, in the head_xtion_rgb_optical_frame
-
                         pose = Pose()
                         pose.position.x = cur_scene_cluster.local_centroid[0]
                         pose.position.y = cur_scene_cluster.local_centroid[1]
@@ -208,25 +205,39 @@ class WorldStateManager:
 
 
                         # raw pointcloud2 message, segmented from the rest of the scene for this object
-                        #cloud_observation.add_message(cur_scene_cluster.cloud,"object_cloud")
+                        cloud_observation.add_message(cur_scene_cluster.cloud,"object_cloud")
+                        # NOTE: Not registered to meta-room yet
 
 
                         if(talk): print("done")
 
                         # next step: can we classify this object, OR do we have a classification for it already?
-                        # TODO: OBJECT LEARNING STUFF GOES HERE
 
-                        # if the object we received has a classification already
+                        # send this cluster to object recogniser
+                        # if we get a distribution back
 
-                        # if the object is not classified
-                            # try to classify it
+                        # else
 
-                                # it's been classified
-                                    # assign classification to object
+                            #
 
-                                # it hasn't been classified
-                                    # what now?
+                            # SOMA INTEGRATION
 
+                            # if this object is unknown, lets register a new unknown object in SOMA2
+
+                            # insert into SOMA2 new unknown object
+
+                                # but wait, SOMA2 might already know about this specific unknown object
+                                # in which case we shouldn't add it
+
+                        soma_obj = rospy.ServiceProxy('/soma2/query_objects',SOMA2QueryObjs)
+
+
+                        # else, if we have a class distribution for this object, retrieve
+                        # the SOMA object that matches it
+
+
+                    else:
+                        print("if you're reading this, something went horribly wrong as this should be impossible to reach.")
 
                 else:
                     if(talk): print("eh")
