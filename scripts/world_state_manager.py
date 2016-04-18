@@ -98,14 +98,18 @@ class WorldStateManager:
         rospy.spin()
 
     def segment_callback(self,data):
+        print("got data")
+        # handles service calls containing point clouds
+        data = data.input
+
         if(talk): print("got cloud:" + str(data.header.seq))
         try:
             self.cluster_tracker.add_unsegmented_scene(data)
             self.assign_clusters()
-
+            return WorldUpdateResponse(True)
         except rospy.ServiceException, e:
             if(talk): print "service call failed: %s"%e
-            return e
+            return WorldUpdateResponse(False)
 
 
 
@@ -233,10 +237,18 @@ class WorldStateManager:
             for prev_scene_cluster in prev_scene.cluster_list:
                 # if the cluster observed in the previous scene is not in the current scene
                 if not cur_scene.contains_cluster_id(prev_scene_cluster.cluster_id):
+
                     if(talk): print("cutting object")
                     # set the internal model to not live
-                    prev_obj = self.world_model.get_object(prev_scene_cluster.cluster_id)
-                    prev_obj.cut()
+                    try:
+                        prev_obj = self.world_model.get_object(prev_scene_cluster.cluster_id)
+                        prev_obj.cut()
+                    except Exception, e:
+                        # we don't even relaly care about this, if it's not in the db
+                        # we're actually good to go
+                        print("err")
+                        print(e)
+
                 else:
                     if(talk): print("object still live, not cutting")
 

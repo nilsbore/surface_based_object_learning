@@ -10,8 +10,8 @@ def cloud_callback(data):
     pub = rospy.Publisher('/world_observations', PointCloud2, queue_size=1)
     print("republishing")
     out = pub.publish(data)
-    print("unregistering")
-    #o_sub.unregister()
+    #print(data.header)
+    world_update(data)
     print("done")
 
 if __name__ == '__main__':
@@ -21,7 +21,6 @@ if __name__ == '__main__':
     #print("got it")
 
     # callback chain to deal with storing *objects*
-    #o_sub = rospy.Subscriber("/head_xtion/depth_registered/points", PointCloud2, cloud_callback)
     print("waiting for service")
     rospy.wait_for_service('update_world_model')
     print("got it")
@@ -30,4 +29,8 @@ if __name__ == '__main__':
     world_update = rospy.ServiceProxy('update_world_model',WorldUpdate)
     print("done")
 
-#    rospy.spin()
+    print("subscribing")
+    o_sub = rospy.Subscriber("/head_xtion/depth_registered/points", PointCloud2, cloud_callback)
+
+
+    rospy.spin()
