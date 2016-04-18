@@ -15,6 +15,8 @@ talk = False
 
 class WorldStateManager:
     def __init__(self):
+        rospy.init_node('world_state_modeling', anonymous = False)
+
         if(talk): print("Manager Online")
 
         # make a cluster tracker
@@ -35,7 +37,7 @@ class WorldStateManager:
         # callback chain to deal with storing *objects*
         #self.o_sub = rospy.Subscriber("/head_xtion/depth_registered/points", PointCloud2, self.segment_callback)
         print("setting up service")
-        update_world_state = rospy.ServiceProxy('update_world_state',WorldUpdate)
+        update_world_state = rospy.Service('update_world_model',WorldUpdate,self.segment_callback)
         print("done")
 
         if(talk): print("done!")
@@ -67,9 +69,7 @@ class WorldStateManager:
 
         #obj._parent = room.name
 
-        #if(talk): print("done")
-        # get all objects in this room that are flagged as alive
-        #live_objects = map(lambda x: x.name, self.world_model.get_children(self.room_name, {'_life_end': None,}))
+        #if(talk): print("done")children(self.room_name, {'_life_end': None,}))
 
         #if(talk): print(live_objects)
 
@@ -105,6 +105,7 @@ class WorldStateManager:
 
         except rospy.ServiceException, e:
             if(talk): print "service call failed: %s"%e
+            return e
 
 
 

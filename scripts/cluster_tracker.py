@@ -259,7 +259,7 @@ class SegmentedScene:
 class SOMAClusterTracker:
 
     def __init__(self):
-        rospy.init_node('soma_cluster_tracker', anonymous = False)
+
         if(talk): print("--created cluster tracker--")
         self.segmentation_service = "/pcl_segmentation_service/pcl_segmentation"
         self.cur_scene = None
