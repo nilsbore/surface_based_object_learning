@@ -1,0 +1,362 @@
+import roslib
+import rospy
+from sensor_msgs.msg import PointCloud2, PointField
+from std_msgs.msg import String
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
+import cv
+import cv2
+import sensor_msgs.point_cloud2 as pc2
+import ctypes
+import struct
+from segmentation_srv_definitions.srv import *
+import numpy as np
+from geometry_msgs.msg import PointStamped
+import tf
+import PyKDL
+import tf2_ros
+import geometry_msgs.msg
+import pcl
+from cluster_tracking_strategies import NaiveClusterTrackingStrategy, VotingBasedClusterTrackingStrategy
+from tf import transformations
+import uuid
+import random
+
+class BBox():
+    """ Bounding box of an object with getter functions.
+    """
+    def __init__(self, bbox):
+        # Calc x_min and x_max for obj1
+        x_sorted = sorted(bbox, key=itemgetter(0))
+        self.x_min = x_sorted[0][0]
+        self.x_max = x_sorted[7][0]
+
+        # Calc y_min and y_max for obj
+        y_sorted = sorted(bbox, key=itemgetter(1))
+        self.y_min = y_sorted[0][1]
+        self.y_max = y_sorted[7][1]
+
+        # Calc z_min and z_max for obj
+        z_sorted = sorted(bbox, key=itemgetter(2))
+        self.z_min = z_sorted[0][2]
+        self.z_max = z_sorted[7][2]
+
+    def __init__(self, x_min, x_max, y_min, y_max, z_min, z_max):
+        self.x_min = x_min
+        self.x_max = x_max
+
+        self.y_min = y_min
+        self.y_max = y_max
+
+        self.z_min = z_min
+        self.z_max = z_max
+
+    def get_x_min(self):
+        return self.x_min
+
+    def get_x_max(self):
+        return self.x_max
+
+    def get_y_min(self):
+        return self.y_min
+
+    def get_y_max(self):
+        return self.y_max
+
+    def get_z_min(self):
+        return self.z_min
+
+    def get_z_max(self):
+        return self.z_max
+
+    def contains_point(self,point):
+        if (self.x_max >= point[0] and self.x_min <= point[0] and self.y_max >= point[1] and self.y_min <= point[1] and self.z_max >= point[2] and self.z_min <= point[2]):
+            return True
+        return False
+
+    def contains_pointstamped(self,point):
+        if (self.x_max >= point.x and self.x_min <= point.x and self.y_max >= point.y and self.y_min <= point.y and self.z_max >= point.z and self.z_min <= point.z):
+            return True
+        return False
+
+    def is_colliding(self,ext_bb):
+        x_min = self.get_x_min()
+        x_max = self.get_x_max()
+        y_min = self.get_y_min()
+        y_max = self.get_y_max()
+
+        e_x_min = ext_bb.get_x_min()
+        e_x_max = ext_bb.get_x_max()
+        e_y_min = ext_bb.get_y_min()
+        e_y_max = ext_bb.get_y_max()
+
+        if (x_max >= e_x_min and x_min <= e_x_max and y_max >= e_y_min and y_min <= e_y_max):
+            return True
+        return False
+
+
+class SegmentedCluster:
+    def __init__(self,idc,cloud):
+        self.data = []
+        self.cloud = cloud
+        self.data_world = []
+        self.cluster_id = idc
+        self.map_centroid = None
+        self.local_centroid = None
+        self.bbox = None
+        self.assigned = False
+
+    def reset_assignment(self):
+        self.assigned = False
+
+class SegmentedScene:
+
+    def reset_cluster_assignments(self):
+        for cluster in self.cluster_list:
+            cluster.reset_assignment()
+
+    def contains_cluster_id(self,id):
+        for cluster in self.cluster_list:
+            if(cluster.cluster_id == id):
+                return True
+        return False
+
+
+    def __init__(self,indices,cloud,listener):
+        print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
+        self.num_clusters = len(indices.clusters_indices)
+        self.cloud = cloud
+        #print(cloud.header)
+        self.raw_cloud = pc2.read_points(cloud)
+        int_data = list(self.raw_cloud)
+        #print("data: " + str(len(int_data)))
+
+        self.cluster_list = []
+
+
+        print("loading clusters")
+
+
+        for root_cluster in indices.clusters_indices:
+            print("--- CLUSTER ----")
+            cid = [random.choice("ABCDEFGHIGJSDHS903R4IDFA34RAFDAFDLLAFD") for _ in range(4)] # this call makes me very nervous
+            cid = ''.join(cid)
+            print("cid: " + str(cid))
+            cur_cluster = SegmentedCluster(cid,root_cluster)
+
+
+            for idx in root_cluster.data:
+                cur_cluster.data.append(int_data[idx])
+
+            #print("i added: " + str(len(cur_cluster.data)) + " points to a cluster")
+
+            # make some space for calculating the world centroid of the cluster
+            x = 0
+            y = 0
+            z = 0
+
+            # make some space for calculating the local centroid of the cluster
+            x_local = 0
+            y_local = 0
+            z_local = 0
+
+            # initalise some extreme values for finding the dimensions of a
+            # bounding rectangle around the object
+            min_x = 99999
+            min_y = 99999
+            min_z = 99999
+
+            max_x = -99999
+            max_y = -99999
+            max_z = -99999
+
+            translation,rotation = listener.lookupTransform("/map", "/head_xtion_rgb_optical_frame", rospy.Time())
+            trans_matrix = np.dot(transformations.translation_matrix(translation), transformations.quaternion_matrix(rotation))
+
+            #print("got transform: ")
+            #print(trans_cache[0])
+
+            for points in cur_cluster.data:
+
+                # store the root points
+
+                # and store the world transformed point too
+                pt_s = PointStamped()
+                pt_s.header = "/map"
+                pt_s.point.x = points[0]
+                pt_s.point.y = points[1]
+                pt_s.point.z = points[2]
+
+                x_local += pt_s.point.x
+                y_local += pt_s.point.y
+                z_local += pt_s.point.z
+
+                xyz = tuple(np.dot(trans_matrix, np.array([pt_s.point.x, pt_s.point.y, pt_s.point.z, 1.0])))[:3]
+                pt_s.point = geometry_msgs.msg.Point(*xyz)
+
+                cur_cluster.data_world.append(pt_s)
+
+                x += pt_s.point.x
+                y += pt_s.point.y
+                z += pt_s.point.z
+
+                if(pt_s.point.x < min_x):
+                    min_x = pt_s.point.x
+
+                if(pt_s.point.y < min_y):
+                    min_y = pt_s.point.y
+
+                if(pt_s.point.z < min_z):
+                    min_z = pt_s.point.z
+
+                if(pt_s.point.x > max_x):
+                    max_x = pt_s.point.x
+
+                if(pt_s.point.y > max_y):
+                    max_y = pt_s.point.y
+
+                if(pt_s.point.z > max_z):
+                    max_z = pt_s.point.z
+
+
+            #print("bbox: [" + str(min_x) + "," + str(min_y) + "," +str(min_z) + "," + str(max_x) + "," + str(max_y) + ","+str(max_z)+"]")
+
+            x /= len(cur_cluster.data)
+            y /= len(cur_cluster.data)
+            z /= len(cur_cluster.data)
+
+            x_local /= len(cur_cluster.data)
+            y_local /= len(cur_cluster.data)
+            z_local /= len(cur_cluster.data)
+
+            # centroid of the cluster
+            ps_t = PointStamped()
+            ps_t.header = "/map"
+            ps_t.point.x = x
+            ps_t.point.y = y
+            ps_t.point.z = z
+
+            cur_cluster.map_centroid = np.array((ps_t.point.x ,ps_t.point.y, ps_t.point.z))
+            cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
+
+
+            print("centroid:")
+            print(cur_cluster.map_centroid)
+            bbox = BBox(min_x,max_x,min_y,max_y,min_z,max_z)
+            cur_cluster.bbox = bbox
+            print("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
+
+            print("is centre point in bbox? " + str(cur_cluster.bbox.contains_point(cur_cluster.map_centroid)))
+            self.cluster_list.append(cur_cluster)
+
+
+
+
+class SOMAClusterTracker:
+
+    def __init__(self):
+        rospy.init_node('soma_cluster_tracker', anonymous = False)
+        print("--created cluster tracker--")
+        self.segmentation_service = "/pcl_segmentation_service/pcl_segmentation"
+        self.cur_scene = None
+        self.prev_scene = None
+        self.segmentation = SegmentationWrapper(self,self.segmentation_service)
+
+
+    def add_unsegmented_scene(self,data):
+        # takes in a SegmentedScene
+
+        # segment the pc
+
+        rospy.wait_for_service(self.segmentation_service)
+
+        try:
+            out = self.segmentation.seg_service(cloud=data)
+        except rospy.ServiceException, e:
+            print(e)
+
+
+        new_scene = SegmentedScene(out,data,self.segmentation.listener)
+        print("new scene added, with " + str(new_scene.num_clusters) + " clusters")
+
+        self.prev_scene = self.cur_scene
+        self.cur_scene = new_scene
+
+        if(self.prev_scene):
+            print("we have a previous observation to compare to")
+            tracker = NaiveClusterTrackingStrategy()
+            tracker.track(self.cur_scene,self.prev_scene)
+        else:
+            print("no previous scene to compare to, skipping merging step")
+
+
+    def add_segmented_scene(self,new_scene):
+        # takes in a SegmentedScene
+        print("new scene added, with " + str(new_scene.num_clusters) + " clusters")
+        self.prev_scene = self.cur_scene
+        self.cur_scene = new_scene
+
+        if(self.prev_scene):
+            print("we have a previous observation to compare to")
+            tracker = NaiveClusterTrackingStrategy()
+            tracker.track(self.cur_scene,self.prev_scene)
+        #else:
+        #    print("no previous scene to compare to, skipping merging step")
+
+class SegmentationWrapper:
+
+
+    def __init__(self,ct,seg_serv):
+
+        print("loading wrapper")
+
+        self.cluster_tracker = ct
+
+        self.listener = tf.TransformListener()
+        print("waiting for tf")
+        self.listener.waitForTransform("/head_xtion_rgb_optical_frame", "/map", rospy.Time(), rospy.Duration(4.0))
+        print("gotcha")
+
+        #self.p_sub = rospy.Subscriber("/head_xtion/depth_registered/points", PointCloud2, self.cloud_callback)
+
+        self.seg_service = rospy.ServiceProxy(seg_serv, segment)
+
+
+    def image_callback(self,data):
+        #try:
+            #bridge = CvBridge()
+            #cv_image = bridge.imgmsg_to_cv2(data,desired_encoding="passthrough")
+            #cv.SaveImage("depth_camera_msg"+str(data.header.seq)+".png", cv.fromarray(cv_image))
+            print "mask saved!"
+        #except CvBridgeError, e:
+          #print e
+
+    def segment_callback(self,data):
+    #    p = PointCloudTools(data)
+        print("got a segmented cloud")
+
+
+
+    def cloud_callback(self,data):
+        #print("got cloud:" + str(data.header.seq))
+        try:
+            out = self.seg_service(cloud=data)
+            print("segmentation complete")
+            p = SegmentedScene(out,data,self.listener)
+            self.cluster_tracker.add_segmented_scene(p)
+            #print(out)
+
+        except rospy.ServiceException, e:
+            print "service call failed: %s"%e
+
+        #if(segmented):
+        #    print("waiting for topic...")
+        #    rospy.wait_for_message('/pcl_segmentation_service/segmented_cloud_colored_img',Image)
+        #    print("got it")
+        #    i_sub = rospy.Subscriber("/pcl_segmentation_service/segmented_cloud_colored_img", Image, image_callback)
+        #    print("subscribing to image")
+
+
+
+if __name__ == '__main__':
+    tracker = SOMAClusterTracker()
