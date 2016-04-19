@@ -137,139 +137,198 @@ class WorldStateManager:
     def get_cur_metaroom(self):
         return "base_room"
 
-    def assign_clusters(self):
-        if(talk): print("assigning")
-        cur_scene = self.cluster_tracker.cur_scene
-        prev_scene = self.cluster_tracker.prev_scene
+    def get_soma_objects_with_id(self,id):
+        print("getting soma service")
+        rospy.wait_for_service('soma2/query_db')
+        print("done")
+        soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
+        print("done")
 
-        if(talk): print("waiting for insert service")
+        query = SOMA2QueryObjsRequest()
 
-        rospy.wait_for_service('/message_store/insert')
+        query.query_type = 0
+        query.usetimestep = False
+        query.uselowertime =  False
+        query.useuppertime =  False
+        query.usedates =  False
+        query.useweekday =  False
+        query.useroi =  False
 
-        if(talk): print("gotcha")
+        query.objectids = ([id])
+        query.objecttypes=['']
 
-        # if this is not scene 0, ie. we have a previous scene to compare to
-        if(prev_scene and cur_scene):
+        response = soma_query(query)
 
-            # set up tf
-            # TODO: THIS NEEDS TO BE *REGISTERED* EVENTUALLY
-            #transform_store = TransformationStore()
-            #transform_store.create_live()
+        return response
 
-        # get all the cluster IDs from current scene
+def assign_clusters(self):
+    if(talk): print("assigning")
+    cur_scene = self.cluster_tracker.cur_scene
+    prev_scene = self.cluster_tracker.prev_scene
 
-        #transform_store = TransformationStore()
-        #transform_store.create_live()
+    if(talk): print("waiting for insert service")
 
-        # for each cluster in this scene
-            for cur_scene_cluster in cur_scene.cluster_list:
-            # is this a new cluster, or was it in the last scene?
+    rospy.wait_for_service('/message_store/insert')
 
-                cur_obj = None
+    if(talk): print("gotcha")
 
-                if(prev_scene.contains_cluster_id(cur_scene_cluster.cluster_id)):
-                    # do we have a living world model for this cluster already?
-                    if(self.cluster_is_live(cur_scene_cluster.cluster_id)):
-                        #   fetch the world_model for the cluster
-                        if(talk): print("got existing object")
-                        cur_obj = self.world_model.get_object(cur_scene_cluster.cluster_id)
-                        #   attach observation from current point to world_model
-                        #   set to live
+    # if this is not scene 0, ie. we have a previous scene to compare to
+    if(prev_scene and cur_scene):
+    # get all the cluster IDs from current scene
+    # for each cluster in this scene
+        for cur_scene_cluster in cur_scene.cluster_list:
+        # is this a new cluster, or was it in the last scene?
+            cur_cluster = None
+            if(prev_scene.contains_cluster_id(cur_scene_cluster.cluster_id)):
+                # do we have a living world model for this cluster already?
+                if(self.cluster_is_live(cur_scene_cluster.cluster_id)):
+                    #   fetch the world_model for the cluster
+                    if(talk): print("got existing object")
+                    cur_cluster = self.world_model.get_object(cur_scene_cluster.cluster_id)
+                else:
+                    # here we know the object doesn't exist and/or isn't live
+                    # BUT we do know that it's in the scene, because it's part of the segmentation output
+                    if(talk): print("creating object")
+                    cur_cluster = self.world_model.create_object(cur_scene_cluster.cluster_id)
+
+                    #TODO: do this properly
+                    cur_cluster._parent = self.get_cur_metaroom()
+
+                # from here we've either added this as a new object to the scene
+                # or retreived the data for it in a previous scene
+
+            if(cur_cluster):
+                # so first add a new observation to it, in all cases
+                if(talk): print("making observation")
+                # add an observation for the object
+                cloud_observation = Observation.make_observation()
+                cur_cluster.add_observation(cloud_observation)
+
+                # centroid of this object, in the head_xtion_rgb_optical_frame
+                pose = Pose()
+                pose.position.x = cur_scene_cluster.local_centroid[0]
+                pose.position.y = cur_scene_cluster.local_centroid[1]
+                pose.position.z = cur_scene_cluster.local_centroid[2]
+
+                if(talk): print("POSE")
+                if(talk): print(pose.position)
+                cur_cluster.add_pose(pose)
+
+
+                # store the segmented point cloud for this cluster
+                cloud_observation.add_message(cur_scene_cluster.cloud,"object_cloud")
+                # NOTE: Not registered to meta-room yet
+
+
+                if(talk): print("done")
+
+                # next step: can we classify this object, OR do we have a classification for it already?
+
+                # send this cluster to object recogniser
+                # if we get a distribution back
+
+                # else
+                    #
+                    # SOMA INTEGRATION
+
+                    # see if we have a soma object by this name
+                    soma_objs = self.get_soma_objects_with_id(cur_cluster.key)
+                    cur_soma_obj = None
+                    if(soma_objs.objects):
+                        # we have a soma object with this id
+                        # retrieve it
+                        cur_soma_obj = soma_objs.objects[0]
+
                     else:
-                        # here we know the object doesn't exist and/or isn't live
-                        # BUT we do know that it's in the scene, because it's part of the segmentation output
-                        if(talk): print("creating object")
-                        cur_obj = self.world_model.create_object(cur_scene_cluster.cluster_id)
-                        cur_obj._parent = self.get_cur_metaroom()
+                        # we do not have a soma object with this id
+                        # create it?
+                        new_obj = SOMA2Object()
+                        new_obj.id = cur_cluster.key
 
-                    # from here we've either added this as a new object to the scene
-                    # or retreived the data for it in a previous scene
-
-                    if(cur_obj):
-                        # so first add a new observation to it, in all cases
-                        if(talk): print("making observation")
-                        # add an observation for the object
-                        cloud_observation = Observation.make_observation()
-
-                        cur_obj.add_observation(cloud_observation)
-
-                        # centroid of this object, in the head_xtion_rgb_optical_frame
-                        pose = Pose()
-                        pose.position.x = cur_scene_cluster.local_centroid[0]
-                        pose.position.y = cur_scene_cluster.local_centroid[1]
-                        pose.position.z = cur_scene_cluster.local_centroid[2]
-
-                        if(talk): print("POSE")
-                        if(talk): print(pose.position)
-                        cur_obj.add_pose(pose)
+                        # TODO: everything is unknown for now, but later on we'll change this to a
+                        # class or instance distribution
+                        new_obj.type = "unknown"
 
 
-                        # raw pointcloud2 message, segmented from the rest of the scene for this object
-                        cloud_observation.add_message(cur_scene_cluster.cloud,"object_cloud")
-                        # NOTE: Not registered to meta-room yet
+
+                    # if this object is unknown, lets register a new unknown object in SOMA2
+
+                    # insert into SOMA2 new unknown object
+
+                        # but wait, SOMA2 might already know about this specific unknown object
+                        # in which ca
+
+            else:
+                print("if you're reading this, something went horribly wrong as this should be impossible to reach.")
+
+            else:
+                if(talk): print("eh")
 
 
-                        if(talk): print("done")
+        # next we need to clean up the scene, and mark anything no longer observable
+        # as not live
+        for prev_scene_cluster in prev_scene.cluster_list:
+            # if the cluster observed in the previous scene is not in the current scene
+            if not cur_scene.contains_cluster_id(prev_scene_cluster.cluster_id):
 
-                        # next step: can we classify this object, OR do we have a classification for it already?
+                if(talk): print("cutting object")
+                # set the internal model to not live
+                try:
+                    prev_cluster = self.world_model.get_object(prev_scene_cluster.cluster_id)
+                    prev_cluster.cut()
+                except Exception, e:
+                    # we don't even relaly care about this, if it's not in the db
+                    # we're actually good to go
+                    print("err")
+                    print(e)
 
-                        # send this cluster to object recogniser
-                        # if we get a distribution back
+            else:
+                if(talk): print("object still live, not cutting")
 
-                        # else
+        # do some cleanup in case of crashes or some other errors
+        live_objects = map(lambda x: x.name, self.world_model.get_children(self.get_cur_metaroom(), {'_life_end': None,}))
+        for o in live_objects:
+            if not cur_scene.contains_cluster_id(o):
+                if(talk): print("killing dangling object")
+                dangling_obj = self.world_model.get_object(o)
+                dangling_obj.cut()class distribution for this object, retrieve
+                    # the SOMA object that matches it
 
-                            #
-
-                            # SOMA INTEGRATION
-
-                            # if this object is unknown, lets register a new unknown object in SOMA2
-
-                            # insert into SOMA2 new unknown object
-
-                                # but wait, SOMA2 might already know about this specific unknown object
-                                # in which case we shouldn't add it
-
-                        soma_obj = rospy.ServiceProxy('/soma2/query_objects',SOMA2QueryObjs)
-
-
-                        # else, if we have a class distribution for this object, retrieve
-                        # the SOMA object that matches it
-
-
-                    else:
-                        print("if you're reading this, something went horribly wrong as this should be impossible to reach.")
 
                 else:
-                    if(talk): print("eh")
+                    print("if you're reading this, something went horribly wrong as this should be impossible to reach.")
+
+            else:
+                if(talk): print("eh")
 
 
-            # next we need to clean up the scene, and mark anything no longer observable
-            # as not live
-            for prev_scene_cluster in prev_scene.cluster_list:
-                # if the cluster observed in the previous scene is not in the current scene
-                if not cur_scene.contains_cluster_id(prev_scene_cluster.cluster_id):
+        # next we need to clean up the scene, and mark anything no longer observable
+        # as not live
+        for prev_scene_cluster in prev_scene.cluster_list:
+            # if the cluster observed in the previous scene is not in the current scene
+            if not cur_scene.contains_cluster_id(prev_scene_cluster.cluster_id):
 
-                    if(talk): print("cutting object")
-                    # set the internal model to not live
-                    try:
-                        prev_obj = self.world_model.get_object(prev_scene_cluster.cluster_id)
-                        prev_obj.cut()
-                    except Exception, e:
-                        # we don't even relaly care about this, if it's not in the db
-                        # we're actually good to go
-                        print("err")
-                        print(e)
+                if(talk): print("cutting object")
+                # set the internal model to not live
+                try:
+                    prev_cluster = self.world_model.get_object(prev_scene_cluster.cluster_id)
+                    prev_cluster.cut()
+                except Exception, e:
+                    # we don't even relaly care about this, if it's not in the db
+                    # we're actually good to go
+                    print("err")
+                    print(e)
 
-                else:
-                    if(talk): print("object still live, not cutting")
+            else:
+                if(talk): print("object still live, not cutting")
 
-            # do some cleanup in case of crashes or some other errors
-            live_objects = map(lambda x: x.name, self.world_model.get_children(self.get_cur_metaroom(), {'_life_end': None,}))
-            for o in live_objects:
-                if not cur_scene.contains_cluster_id(o):
-                    if(talk): print("killing dangling object")
-                    dangling_obj = self.world_model.get_object(o)
-                    dangling_obj.cut()
+        # do some cleanup in case of crashes or some other errors
+        live_objects = map(lambda x: x.name, self.world_model.get_children(self.get_cur_metaroom(), {'_life_end': None,}))
+        for o in live_objects:
+            if not cur_scene.contains_cluster_id(o):
+                if(talk): print("killing dangling object")
+                dangling_obj = self.world_model.get_object(o)
+                dangling_obj.cut()
 
 if __name__ == '__main__':
     world_state_manager = WorldStateManager()

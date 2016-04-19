@@ -18,24 +18,44 @@ if __name__ == '__main__':
     soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
     print("done")
     print("making query")
-    query = soma_query(objectids=['hello'])
-    print(query)
+
+    query = SOMA2QueryObjsRequest()
+    query.query_type = 0
+    query.usetimestep = False
+    query.uselowertime =  False
+    query.useuppertime =  False
+    query.usedates =  False
+    query.useweekday =  False
+    query.useroi =  False
+
+    query.objectids = (["hello"])
+    query.objecttypes=['']
+
+    response = soma_query(query)
+    print(response)
+
+    if not response.objects:
+        print("empty!")
+
+    print(response.objects[0])
+
+
     print("done")
 
-    print("trying to insert")
-    soma_insert = rospy.ServiceProxy('soma2/insert_objects',SOMA2InsertObjs)
-    print("getting service")
-    rospy.wait_for_service('soma2/insert_objects')
-    print("done")
+    #print("trying to insert")
+    #soma_insert = rospy.ServiceProxy('soma2/insert_objects',SOMA2InsertObjs)
+    #print("getting service")
+    #rospy.wait_for_service('soma2/insert_objects')
+    #print("done")
 
-    new_obj = SOMA2Object()
-    new_obj.id = "hello"
+    #new_obj = SOMA2Object()
+    #new_obj.id = "hello"
 
-    print("object created")
+    #print("object created")
 
     #soma_insert([new_obj])
 
-    print("object inserted")
+    #print("object inserted")
 
 
     rospy.spin()
