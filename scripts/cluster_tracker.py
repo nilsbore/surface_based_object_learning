@@ -1,8 +1,7 @@
 import roslib
 import rospy
-from sensor_msgs.msg import PointCloud2, PointField
+from sensor_msgs.msg import PointCloud2, PointField, Image
 from std_msgs.msg import String
-from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 import cv
 import cv2
@@ -100,6 +99,7 @@ class BBox():
 class SegmentedCluster:
     def __init__(self,idc,cloud):
         self.data = []
+        self.col_data = []
         self.cloud = cloud
         self.data_world = []
         self.cluster_id = idc
@@ -124,11 +124,41 @@ class SegmentedScene:
         return False
 
 
-    def __init__(self,indices,cloud,listener,mask):
+    def __init__(self,indices,cloud,listener,col_image,col_cloud):
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.cloud = cloud
-        self.seg_mask = mask
+
+        self.col_seg_image = col_image
+        self.col_seg_cloud = pc2.read_points(col_cloud)
+        col_data = list(self.col_seg_cloud)
+
+        colours = set()
+
+        for x in col_data:
+            test = x[3]
+            # cast float32 to int so that bitwise operations are possible
+            s = struct.pack('>f' ,test)
+            i = struct.unpack('>l',s)[0]
+            # you can get back the float value by the inverse operations
+            pack = ctypes.c_uint32(i).value
+            r = (pack & 0x00FF0000)>> 16
+            g = (pack & 0x0000FF00)>> 8
+            b = (pack & 0x000000FF)
+
+            #print r,g,b # prints r,g,b values in the 0-255 range
+                        # x,y,z can be retrieved from the x[0],x[1],x[2]
+            colours.add((r,g,b))
+
+
+
+            
+
+        print("found cols: " + str(colours))
+        #print("reading seg mask")
+        #self.seg_mask_cloud = pc2.read_points(ccld)
+        #print("done")
+
         #if(talk): print(cloud.header)
         self.raw_cloud = pc2.read_points(cloud)
         int_data = list(self.raw_cloud)
@@ -267,6 +297,14 @@ class SOMAClusterTracker:
         self.prev_scene = None
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
 
+        self.col_cloud_sub = rospy.Subscriber("/pcl_segmentation_service/segmented_cloud_colored", PointCloud2, self.cloud_cb)
+        self.col_img_sub =  rospy.Subscriber("/pcl_segmentation_service/segmented_cloud_colored_img", Image, self.image_cb)
+
+    def image_cb(self, data):
+        self.cur_seg_color_image = data
+
+    def cloud_cb(self, data):
+        self.cur_seg_color_cloud = data
 
     def add_unsegmented_scene(self,data):
         # takes in a SegmentedScene
@@ -277,16 +315,9 @@ class SOMAClusterTracker:
 
         try:
             out = self.segmentation.seg_service(cloud=data)
+            #print("zzz")
 
-            print("waiting to get image mask")
-            img = rospy.wait_for_message("/pcl_segmentation_service/segmented_cloud_colored_img",  sensor_msgs.msg.Image, timeout=5.0)
-
-            if(img):
-                print("got image mask")
-            else:
-                print("didn't get image mask")
-
-            new_scene = SegmentedScene(out,data,self.segmentation.listener,img)
+            new_scene = SegmentedScene(out,data,self.segmentation.listener,self.cur_seg_color_image,self.cur_seg_color_cloud)
 
             if(talk): print("new scene added, with " + str(new_scene.num_clusters) + " clusters")
 

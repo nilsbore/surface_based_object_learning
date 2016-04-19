@@ -208,31 +208,29 @@ class WorldStateManager:
                         #TODO: do this properly
                         cur_cluster._parent = self.get_cur_metaroom()
 
-
                 # from here we've either added this as a new object to the scene
                 # or retreived the data for it in a previous scene
                 if(cur_cluster):
                     # so first add a new observation to it, in all cases
                     if(talk): print("making observation")
                     # add an observation for the object
-                    cloud_observation = Observation.make_observation()
-                    cur_cluster.add_observation(cloud_observation)
+
+                    #cloud_observation = Observation.make_observation()
+                    #cur_cluster.add_observation(cloud_observation)
 
                     # centroid of this object, in the head_xtion_rgb_optical_frame
-                    pose = Pose()
-                    pose.position.x = cur_scene_cluster.local_centroid[0]
-                    pose.position.y = cur_scene_cluster.local_centroid[1]
-                    pose.position.z = cur_scene_cluster.local_centroid[2]
+                    #pose = Pose()
+                    #pose.position.x = cur_scene_cluster.local_centroid[0]
+                    #pose.position.y = cur_scene_cluster.local_centroid[1]
+                    #pose.position.z = cur_scene_cluster.local_centroid[2]
 
-                    if(talk): print("POSE")
-                    if(talk): print(pose.position)
-                    cur_cluster.add_pose(pose)
-
+                    #if(talk): print("POSE")
+                    #if(talk): print(pose.position)
+                    #cur_cluster.add_pose(pose)
 
                     # store the segmented point cloud for this cluster
-                    cloud_observation.add_message(cur_scene_cluster.cloud,"object_cloud")
+                    #cloud_observation.add_message(cur_scene_cluster.cloud,"object_cloud")
                     # NOTE: Not registered to meta-room yet
-
 
                     if(talk): print("done")
 
@@ -244,33 +242,56 @@ class WorldStateManager:
                     # else
                         #
                         # SOMA INTEGRATION
-
                     if(False):
-                        # see if we have a soma object by this name
-                        soma_objs = self.get_soma_objects_with_id(cur_cluster.key)
-                        cur_soma_obj = None
-                        if(soma_objs.objects):
-                            print("soma has this object")
-                            # we have a soma object with this id
-                            # retrieve it
-                            cur_soma_obj = soma_objs.objects[0]
-                    else:
-                        print("soma doesn't have this object")
-                        # if this object is unknown, lets register a new unknown object in SOMA2
-                        # we do not have a soma object with this id
-                        # create it
-                        cur_soma_obj = SOMA2Object()
-                        cur_soma_obj.id = cur_cluster.key
+                            # see if we have a soma object by this name
+                            soma_objs = self.get_soma_objects_with_id(cur_cluster.key)
+                            cur_soma_obj = None
+                            if(soma_objs.objects):
+                                print("soma has this object")
+                                # we have a soma object with this id
+                                # retrieve it
+                                cur_soma_obj = soma_objs.objects[0]
+                        #else:
+                            print("soma doesn't have this object")
+                            # if this object is unknown, lets register a new unknown object in SOMA2
+                            # we do not have a soma object with this id
+                            # create it
+                            cur_soma_obj = SOMA2Object()
+                            cur_soma_obj.id = cur_cluster.key
+            # see if we have a soma object by this name
+                            soma_objs = self.get_soma_objects_with_id(cur_cluster.key)
+                            cur_soma_obj = None
+                            if(soma_objs.objects):
+                                print("soma has this object")
+                                # we have a soma object with this id
+                                # retrieve it
+                                cur_soma_obj = soma_objs.objects[0]
+                        #else:
+                            print("soma doesn't have this object")
+                            # if this object is unknown, lets register a new unknown object in SOMA2
+                            # we do not have a soma object with this id
+                            # create it
+                            cur_soma_obj = SOMA2Object()
+                            cur_soma_obj.id = cur_cluster.key
 
-                        # TODO: everything is unknown for now, but later on we'll change this to a
-                        # class or instance distribution
-                        cur_soma_obj.type = "unknown"
+                            # TODO: everything is unknown for now, but later on we'll change this to a
+                            # class or instance distribution
+                            cur_soma_obj.type = "unknown"
 
-                        # either way we want to record this, so just do it here?
-                        cur_soma_obj.cloud = cur_scene_cluster.cloud
-                        cur_soma_obj.pose = pose
-                        msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
-                        new_obj.sweepCenter = msg
+                            # either way we want to record this, so just do it here?
+                            cur_soma_obj.cloud = cur_scene_cluster.cloud
+                            cur_soma_obj.pose = pose
+                            msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
+                            new_obj.sweepCenter = msg
+                            # TODO: everything is unknown for now, but later on we'll change this to a
+                            # class or instance distribution
+                            cur_soma_obj.type = "unknown"
+
+                            # either way we want to record this, so just do it here?
+                            cur_soma_obj.cloud = cur_scene_cluster.cloud
+                            cur_soma_obj.pose = pose
+                            msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
+                            new_obj.sweepCenter = msg
 
 
 
