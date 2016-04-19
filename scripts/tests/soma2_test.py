@@ -6,6 +6,7 @@ from world_modeling.srv import *
 # SOMA2 stuff
 from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
+from geometry_msgs.msg import Pose
 
 if __name__ == '__main__':
     rospy.init_node('test_soma2', anonymous = False)
@@ -37,10 +38,14 @@ if __name__ == '__main__':
     if not response.objects:
         print("empty!")
 
-    print(response.objects[0])
+    #print(response.objects[0])
 
 
     print("done")
+
+
+    msg = rospy.wait_for_message("/robot_pose", geometry_msgs.msg.Pose, timeout=3.0)
+    print(msg)
 
     #print("trying to insert")
     #soma_insert = rospy.ServiceProxy('soma2/insert_objects',SOMA2InsertObjs)

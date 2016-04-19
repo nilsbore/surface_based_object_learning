@@ -3,6 +3,7 @@ import rospy
 from sensor_msgs.msg import PointCloud2, PointField
 from cluster_tracker import SOMAClusterTracker
 from world_modeling.srv import *
+from geometry_msgs.msg import Pose
 
 # WS stuff
 from soma_io.observation import Observation, TransformationStore
@@ -137,6 +138,14 @@ class WorldStateManager:
     def get_cur_metaroom(self):
         return "base_room"
 
+    def add_soma_object(self,obj):
+        print("getting service")
+        rospy.wait_for_service('soma2/insert_objects')
+        print("done")
+        soma_insert = rospy.ServiceProxy('soma2/insert_objects',SOMA2InsertObjs)
+        soma_insert(obj)
+
+
     def get_soma_objects_with_id(self,id):
         print("getting soma service")
         rospy.wait_for_service('soma2/query_db')
@@ -235,28 +244,30 @@ def assign_clusters(self):
                     soma_objs = self.get_soma_objects_with_id(cur_cluster.key)
                     cur_soma_obj = None
                     if(soma_objs.objects):
+                        print("soma has this object")
                         # we have a soma object with this id
                         # retrieve it
                         cur_soma_obj = soma_objs.objects[0]
 
                     else:
+                        print("soma doesn't have this object")
+                        # if this object is unknown, lets register a new unknown object in SOMA2
                         # we do not have a soma object with this id
-                        # create it?
-                        new_obj = SOMA2Object()
-                        new_obj.id = cur_cluster.key
+                        # create it
+                        cur_soma_obj = SOMA2Object()
+                        cur_soma_obj.id = cur_cluster.key
 
                         # TODO: everything is unknown for now, but later on we'll change this to a
                         # class or instance distribution
-                        new_obj.type = "unknown"
+                        cur_soma_obj.type = "unknown"
+
+                    # either way we want to record this, so just do it here?
+                    cur_soma_obj.cloud = cur_scene_cluster.cloud
+                    cur_soma_obj.pose = pose
+                    msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
+                    new_obj.sweepCenter = msg
 
 
-
-                    # if this object is unknown, lets register a new unknown object in SOMA2
-
-                    # insert into SOMA2 new unknown object
-
-                        # but wait, SOMA2 might already know about this specific unknown object
-                        # in which ca
 
             else:
                 print("if you're reading this, something went horribly wrong as this should be impossible to reach.")
