@@ -124,10 +124,11 @@ class SegmentedScene:
         return False
 
 
-    def __init__(self,indices,cloud,listener):
+    def __init__(self,indices,cloud,listener,mask):
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.cloud = cloud
+        self.seg_mask = mask
         #if(talk): print(cloud.header)
         self.raw_cloud = pc2.read_points(cloud)
         int_data = list(self.raw_cloud)
@@ -277,7 +278,16 @@ class SOMAClusterTracker:
         try:
             out = self.segmentation.seg_service(cloud=data)
 
-            new_scene = SegmentedScene(out,data,self.segmentation.listener)
+            print("waiting to get image mask")
+            img = rospy.wait_for_message("/pcl_segmentation_service/segmented_cloud_colored_img",  sensor_msgs.msg.Image, timeout=5.0)
+
+            if(img):
+                print("got image mask")
+            else:
+                print("didn't get image mask")
+
+            new_scene = SegmentedScene(out,data,self.segmentation.listener,img)
+
             if(talk): print("new scene added, with " + str(new_scene.num_clusters) + " clusters")
 
             self.prev_scene = self.cur_scene
