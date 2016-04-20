@@ -23,9 +23,6 @@ class WorldStateManager:
         rospy.init_node('world_state_modeling', anonymous = False)
 
         if(talk): print("Manager Online")
-
-
-
         # make a cluster tracker
         self.world_model = World(server_host="bobl",server_port=62345)
         if(talk): print("world model done")
