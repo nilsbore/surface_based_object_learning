@@ -189,7 +189,7 @@ class WorldStateManager:
         if not prev_scene:
             print("don't have prev")
 
-        if not cut_scene:
+        if not cur_scene:
             print("don't have cur")
 
         if(prev_scene and cur_scene):
