@@ -171,7 +171,7 @@ class SegmentedScene:
 
 
 
-    def __init__(self,indices,cloud,listener,col_image,col_cloud):
+    def __init__(self,indices,cloud,listener):
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.cloud = cloud
