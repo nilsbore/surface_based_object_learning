@@ -27,7 +27,7 @@ class WorldStateManager:
 
 
         # make a cluster tracker
-        self.world_model = World(server_host="woody",server_port=62345)
+        self.world_model = World(server_host="bobl",server_port=62345)
         if(talk): print("world model done")
 
         self.cluster_tracker = SOMAClusterTracker()
