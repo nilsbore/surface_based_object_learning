@@ -24,7 +24,7 @@ class WorldStateManager:
 
         if(talk): print("Manager Online")
 
-    
+
 
         # make a cluster tracker
         self.world_model = World(server_host="woody",server_port=62345)
@@ -272,7 +272,7 @@ class WorldStateManager:
                         cur_soma_obj.id = cur_cluster.key
 
                         # either way we want to record this, so just do it here?
-                        #cur_soma_obj.cloud = cur_scene_cluster.cloud
+                        cur_soma_obj.cloud = cur_scene_cluster.raw_segmented_pc
 
                         soma_pose = geometry_msgs.msg.Pose()
                         soma_pose.position.x = cur_scene_cluster.local_centroid[0]

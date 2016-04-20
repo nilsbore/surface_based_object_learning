@@ -302,10 +302,7 @@ class SegmentedScene:
 
 
 
-            header = std_msgs.msg.Header()
-            header.stamp = rospy.Time.now()
-            header.frame_id = 'map'
-            cur_cluster.raw_segmented_pc = pc2.create_cloud_xyz32(header, raw)
+
 
 
 
@@ -329,6 +326,10 @@ class SegmentedScene:
             cur_cluster.map_centroid = np.array((ps_t.point.x ,ps_t.point.y, ps_t.point.z))
             cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
 
+            header = std_msgs.msg.Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = 'map'
+            cur_cluster.raw_segmented_pc = pc2.create_cloud_xyz32(header, raw)
 
 
             ps_test = PointStamped()
