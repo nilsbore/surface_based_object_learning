@@ -175,7 +175,6 @@ class SegmentedScene:
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.cloud = cloud
-        test_pub = rospy.Publisher('/test_pc_saving', PointCloud2, queue_size=5)
 
 
         #print("reading seg mask")
@@ -299,12 +298,6 @@ class SegmentedScene:
 
                 if(pt_s.point.z > max_z):
                     max_z = pt_s.point.z
-
-
-
-
-
-
 
             #if(talk): print("bbox: [" + str(min_x) + "," + str(min_y) + "," +str(min_z) + "," + str(max_x) + "," + str(max_y) + ","+str(max_z)+"]")
 

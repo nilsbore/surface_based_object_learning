@@ -13,7 +13,7 @@ import soma_io.geometry as ws_geom
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo, JointState
 
 # SOMA2 stuff
-from soma2_msgs.msg import SOMA2Object
+from soma2_msgs.msg import SOMA2Objectf
 from soma_manager.srv import *
 
 talk = True
@@ -37,9 +37,9 @@ class WorldStateManager:
         self.transform_store.create_live()
 
         # get the current point cloud
-        if(talk): print("waiting for pc")
-        rospy.wait_for_message('/head_xtion/depth_registered/points',PointCloud2)
-        if(talk): print("got it")
+        #if(talk): print("waiting for pc")
+        #rospy.wait_for_message('/head_xtion/depth_registered/points',PointCloud2)
+        #if(talk): print("got it")
 
         # callback chain to deal with storing *objects*
         # self.o_sub = rospy.Subscriber("/head_xtion/depth_registered/points", PointCloud2, self.segment_callback)
