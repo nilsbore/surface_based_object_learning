@@ -169,10 +169,7 @@ class WorldStateManager:
         response = soma_query(query)
 
         return response
-
-    def get_image_masks(self):
-        msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
-
+        
     def assign_clusters(self):
         if(talk): print("assigning")
         cur_scene = self.cluster_tracker.cur_scene

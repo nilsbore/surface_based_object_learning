@@ -1,6 +1,6 @@
 import roslib
 import rospy
-from sensor_msgs.msg import PointCloud2, PointField, Image
+from sensor_msgs.msg import PointCloud2, PointField, Image, CameraInfo
 from std_msgs.msg import String
 from cv_bridge import CvBridge, CvBridgeError
 import cv
@@ -19,7 +19,7 @@ from cluster_tracking_strategies import NaiveClusterTrackingStrategy, VotingBase
 from tf import transformations
 import uuid
 import random
-
+import image_geometry
 talk = False
 
 class BBox():
@@ -139,16 +139,35 @@ class SegmentedScene:
 
         return [x,y,z]
 
+    #
+    # This whole method is a bunch of horrible hacks, please look away
+    #
+    def calculate_2d_image_bbox(self,bbmin,bbmax):
+        model = image_geometry.PinholeCameraModel()
+        print("waiting for camera")
+        camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=3.0)
+        model.fromCameraInfo(camera_msg)
+        #print("got it")
+        #tfl = tf.TransformListener()
+        # this might be wrong
+        #point = tfl.transformPoint("/head_xtion_rgb_optical_frame", ps_test)
 
-    def calculate_bbox(self,image_msg):
-        cv_image = self.bridge.imgmsg_to_cv2(image_msg, desired_encoding="bgr8")
-        (rows,cols,channels) = cv_image.shape
-        print("img w: " + str(cols) + " img h: " + str(rows))
 
-        for i in range(640):
-            for j in range(480):
-                pixel = cv_image[j][i]
+        bbox_min = model.project3dToPixel((bbmin[0], bbmin[1], bbmin[2]))
+        bbox_max = model.project3dToPixel((bbmax[0], bbmax[1], bbmax[2]))
+        return (bbox_min,bbox_max)
 
+
+    def calculate_2d_image_centroid(self,centroid):
+        model = image_geometry.PinholeCameraModel()
+        camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=3.0)
+        model.fromCameraInfo(camera_msg)
+        #print("got it")
+        #tfl = tf.TransformListener()
+        # this might be wrong
+        #point = tfl.transformPoint("/head_xtion_rgb_optical_frame", ps_test)
+        px = model.project3dToPixel((centroid[0], centroid[1], centroid[2]))
+        return px
 
 
 
@@ -156,52 +175,6 @@ class SegmentedScene:
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.cloud = cloud
-        self.bridge = CvBridge()
-
-        # links the coloured segmented point cloud to the other stuff
-        self.col_seg_image = col_image
-
-        self.calculate_bbox(self.col_seg_image)
-
-
-        self.col_seg_cloud = pc2.read_points(col_cloud)
-        colour_data = list(self.col_seg_cloud)
-
-        colours = {}
-        colour_centroids = {}
-
-        for x in colour_data:
-            test = x[3]
-            # cast float32 to int so that bitwise operations are possible
-            s = struct.pack('>f' ,test)
-            i = struct.unpack('>l',s)[0]
-            # you can get back the float value by the inverse operations
-            pack = ctypes.c_uint32(i).value
-            r = (pack & 0x00FF0000)>> 16
-            g = (pack & 0x0000FF00)>> 8
-            b = (pack & 0x000000FF)
-
-            #print r,g,b # prints r,g,b values in the 0-255 range
-            # x,y,z can be retrieved from the x[0],x[1],x[2]
-            if (r,g,b) not in colours.keys():
-                print("added colour: " + str([r,g,b]))
-                colours[(r,g,b)] = []
-
-            colours[(r,g,b)].append([x[0],x[1],x[2]])
-
-        print("found colours: " + str(colours.keys()) +" from cloud")
-
-    #    for key in colours.keys():
-    #        print("FOR THIS KEY: " + str(key))
-    #        print("POINTS ARE: ")
-    #        print(colours[key])
-    #        print("\n\n")
-
-        for key in colours.keys():
-            print("FOR THIS KEY: " + str(key))
-            print("CENTROID IS: ")
-            print(self.calculate_centroid(colours[key]))
-            colour_centroids[key] = self.calculate_centroid(colours[key])
 
 
         #print("reading seg mask")
@@ -215,10 +188,7 @@ class SegmentedScene:
 
         self.cluster_list = []
 
-
         if(talk): print("loading clusters")
-
-
         for root_cluster in indices.clusters_indices:
             if(talk): print("--- CLUSTER ----")
 
@@ -254,6 +224,14 @@ class SegmentedScene:
             max_y = -99999
             max_z = -99999
 
+            local_min_x = 99999
+            local_min_y = 99999
+            local_min_z = 99999
+
+            local_max_x = -99999
+            local_max_y = -99999
+            local_max_z = -99999
+
             translation,rotation = listener.lookupTransform("/map", "/head_xtion_rgb_optical_frame", rospy.Time())
             trans_matrix = np.dot(transformations.translation_matrix(translation), transformations.quaternion_matrix(rotation))
 
@@ -262,9 +240,7 @@ class SegmentedScene:
 
             for points in cur_cluster.data:
 
-                # store the root points
-
-                # and store the world transformed point too
+                # store the roxe world transformed point too
                 pt_s = PointStamped()
                 pt_s.header = "/map"
                 pt_s.point.x = points[0]
@@ -274,6 +250,24 @@ class SegmentedScene:
                 x_local += pt_s.point.x
                 y_local += pt_s.point.y
                 z_local += pt_s.point.z
+
+                if(pt_s.point.x > local_max_x):
+                    local_max_x = pt_s.point.x
+
+                if(pt_s.point.y > local_max_y):
+                    local_max_y = pt_s.point.y
+
+                if(pt_s.point.z > local_max_z):
+                    local_max_z = pt_s.point.z
+
+                if(pt_s.point.x < local_min_x):
+                    local_min_x = pt_s.point.x
+
+                if(pt_s.point.y < local_min_y):
+                    local_min_y = pt_s.point.y
+
+                if(pt_s.point.z < local_min_z):
+                    local_min_z = pt_s.point.z
 
                 xyz = tuple(np.dot(trans_matrix, np.array([pt_s.point.x, pt_s.point.y, pt_s.point.z, 1.0])))[:3]
                 pt_s.point = geometry_msgs.msg.Point(*xyz)
@@ -292,6 +286,7 @@ class SegmentedScene:
 
                 if(pt_s.point.z < min_z):
                     min_z = pt_s.point.z
+
 
                 if(pt_s.point.x > max_x):
                     max_x = pt_s.point.x
@@ -323,28 +318,31 @@ class SegmentedScene:
             cur_cluster.map_centroid = np.array((ps_t.point.x ,ps_t.point.y, ps_t.point.z))
             cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
 
-            # which of the known colour centroids is closest to this local_centroid?
-            best = None
-            bdist = 100000
-            for cent in colour_centroids.keys():
-                dist = np.linalg.norm(cur_cluster.local_centroid-colour_centroids[cent])
-                if(dist < bdist):
-                    bdist = dist
-                    best = cent
 
-            print("found the best at: " + str(bdist) + " which is col: " + str(best))
 
-            cur_cluster.colour = best
+            ps_test = PointStamped()
+            ps_test.header.frame_id = "/head_xtion_rgb_optical_frame"
+            ps_test.point.x = x_local
+            ps_test.point.y = y_local
+            ps_test.point.z = z_local
+
 
             print("centroid:")
             print("map centroid:" + str(cur_cluster.map_centroid))
             print("local centroid:" + str(cur_cluster.local_centroid))
 
+            cur_cluster.img_centroid = self.calculate_2d_image_centroid(cur_cluster.local_centroid)
+            cur_cluster.img_bbox = self.calculate_2d_image_bbox([local_min_x,local_min_y,local_min_z],[local_max_x,local_max_y,local_max_z])
+
+            print("img centroid: " + str(cur_cluster.img_centroid))
+            print("img bbox: " + str(cur_cluster.img_bbox))
+
             bbox = BBox(min_x,max_x,min_y,max_y,min_z,max_z)
+
             cur_cluster.bbox = bbox
             if(talk): print("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
 
-            if(talk): print("is centre point in bbox? " + str(cur_cluster.bbox.contains_point(cur_cluster.map_centroid)))
+        #    if(talk): print("is centre point in bbox? " + str(cur_cluster.bbox.contains_point(cur_cluster.map_centroid)))
             self.cluster_list.append(cur_cluster)
 
 
@@ -360,14 +358,16 @@ class SOMAClusterTracker:
         self.prev_scene = None
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
 
-        self.col_cloud_sub = rospy.Subscriber("/pcl_segmentation_service/segmented_cloud_colored", PointCloud2, self.cloud_cb)
+
         self.col_img_sub =  rospy.Subscriber("/pcl_segmentation_service/segmented_cloud_colored_img", Image, self.image_cb)
+        self.col_cloud_sub = rospy.Subscriber("/pcl_segmentation_service/segmented_cloud_colored", PointCloud2, self.cloud_cb)
+        print("got it")
 
-    def image_cb(self, data):
-        self.cur_seg_color_image = data
+    def image_cb(self, img_data):
+        self.cur_seg_color_image = img_data
 
-    def cloud_cb(self, data):
-        self.cur_seg_color_cloud = data
+    def cloud_cb(self, cl_data):
+        self.cur_seg_color_cloud = cl_data
 
     def add_unsegmented_scene(self,data):
         # takes in a SegmentedScene
@@ -378,6 +378,13 @@ class SOMAClusterTracker:
 
         try:
             out = self.segmentation.seg_service(cloud=data)
+        #    print("zzz")
+        #    print("waiting for img")
+        #    cur_img = rospy.wait_for_message("/pcl_segmentation_service/segmented_cloud_colored_img",Image)
+        #    print("waiting for cld")
+        #    cur_cld = rospy.wait_for_message("/pcl_segmentation_service/segmented_cloud_colored",sensor_msgs.msg.PointCloud2)
+        #    print("done")
+
             #print("zzz")
 
             new_scene = SegmentedScene(out,data,self.segmentation.listener,self.cur_seg_color_image,self.cur_seg_color_cloud)
