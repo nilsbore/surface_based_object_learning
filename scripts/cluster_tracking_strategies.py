@@ -103,7 +103,7 @@ class NaiveClusterTrackingStrategy(ClusterTrackingStrategy):
 
                     # the centroid of the new cluster
                     # is outside the bbox of the last
-                    if(cur_scene.cluster_list[e.index_one].bbox.contains_point(prev_scene.cluster_list[e.index_two].map_centroid)):
+                #    if(cur_scene.cluster_list[e.index_one].bbox.contains_point(prev_scene.cluster_list[e.index_two].map_centroid)):
                         if(self.talk): print("new cluster's centroid in prev cluster")
                         cur_scene.cluster_list[e.index_one].assigned = True
                         prev_scene.cluster_list[e.index_two].assigned = True
@@ -111,11 +111,11 @@ class NaiveClusterTrackingStrategy(ClusterTrackingStrategy):
                         cur_scene.cluster_list[e.index_one].cluster_id = prev_scene.cluster_list[e.index_two].cluster_id
                         if(self.talk): print("that cluster UUID is: " + str(cur_scene.cluster_list[e.index_one].cluster_id))
                         num_assigned+=1
-                    else:
-                        if(self.talk): print("old cluster doesn't contain new centroid, dist: " + str(e.dist))
-                        if(self.talk): print("cur centroid: " + str(cur_scene.cluster_list[e.index_one].map_centroid))
-                        bbox = prev_scene.cluster_list[e.index_two].bbox
-                        if(self.talk): print("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
+                    #else:
+                    #    if(self.talk): print("old cluster doesn't contain new centroid, dist: " + str(e.dist))
+                    #    if(self.talk): print("cur centroid: " + str(cur_scene.cluster_list[e.index_one].map_centroid))
+                    #    bbox = prev_scene.cluster_list[e.index_two].bbox
+                    #    if(self.talk): print("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
 
         if(self.talk): print("assigned: " + str(num_assigned) + " clusters ")
 

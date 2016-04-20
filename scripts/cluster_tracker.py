@@ -345,6 +345,7 @@ class SegmentedScene:
             bbox = BBox(min_x,max_x,min_y,max_y,min_z,max_z)
 
             cur_cluster.bbox = bbox
+            
             if(talk): print("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
 
         #    if(talk): print("is centre point in bbox? " + str(cur_cluster.bbox.contains_point(cur_cluster.map_centroid)))

@@ -185,9 +185,15 @@ class WorldStateManager:
 
         if(talk): print("gotcha")
 
-
         # if this is not scene 0, ie. we have a previous scene to compare to
+        if not prev_scene:
+            print("don't have prev")
+
+        if not cut_scene:
+            print("don't have cur")
+
         if(prev_scene and cur_scene):
+            print("got both prev and cur")
         # get all the cluster IDs from current scene
         # for each cluster in this scene
             for cur_scene_cluster in cur_scene.cluster_list:
@@ -294,7 +300,6 @@ class WorldStateManager:
             for prev_scene_cluster in prev_scene.cluster_list:
                 # if the cluster observed in the previous scene is not in the current scene
                 if not cur_scene.contains_cluster_id(prev_scene_cluster.cluster_id):
-
                     if(talk): print("cutting object")
                     # set the internal model to not live
                     try:
@@ -303,8 +308,9 @@ class WorldStateManager:
                     except Exception, e:
                         # we don't even relaly care about this, if it's not in the db
                         # we're actually good to go
-                        print("err")
+                        print("error:")
                         print(e)
+                        print("^^^")
 
                 else:
                     if(talk): print("object still live, not cutting")
