@@ -270,6 +270,7 @@ class WorldStateManager:
                         # create it
                         cur_soma_obj = SOMA2Object()
                         cur_soma_obj.id = cur_cluster.key
+                        cur_soma_obj.type = "unknown"
 
                         # either way we want to record this, so just do it here?
                         cur_soma_obj.cloud = cur_scene_cluster.raw_segmented_pc
@@ -284,7 +285,6 @@ class WorldStateManager:
                         cur_soma_obj.sweepCenter = msg
                         # TODO: everything is unknown for now, but later on we'll change this to a
                         # class or instance distribution
-                        cur_soma_obj.type = "unknown"
                         print("inserting into SOMA")
                         res = self.soma_insert([cur_soma_obj])
                         print("result: ")
