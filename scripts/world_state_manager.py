@@ -13,7 +13,7 @@ import soma_io.geometry as ws_geom
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo, JointState
 
 # SOMA2 stuff
-from soma2_msgs.msg import SOMA2Objectf
+from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
 
 talk = True
