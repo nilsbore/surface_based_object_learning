@@ -175,6 +175,7 @@ class SegmentedScene:
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.cloud = cloud
+        test_pub = rospy.Publisher('/test_pc_saving', PointCloud2, queue_size=5)
 
 
         #print("reading seg mask")
@@ -197,6 +198,7 @@ class SegmentedScene:
             cid = str(uuid.uuid4()) # str so we can later link it to a soma2 object, which indexes by string
             if(talk): print("randomly assigned temporary cid: " + str(cid))
             cur_cluster = SegmentedCluster(cid,root_cluster)
+
 
 
             for idx in root_cluster.data:
@@ -238,8 +240,8 @@ class SegmentedScene:
             #if(talk): print("got transform: ")
             #if(talk): print(trans_cache[0])
 
+            raw = []
             for points in cur_cluster.data:
-
                 # store the roxe world transformed point too
                 pt_s = PointStamped()
                 pt_s.header = "/map"
@@ -272,6 +274,7 @@ class SegmentedScene:
                 xyz = tuple(np.dot(trans_matrix, np.array([pt_s.point.x, pt_s.point.y, pt_s.point.z, 1.0])))[:3]
                 pt_s.point = geometry_msgs.msg.Point(*xyz)
 
+                raw.append((pt_s.point.x,pt_s.point.y,pt_s.point.z))
                 cur_cluster.data_world.append(pt_s)
 
                 x += pt_s.point.x
@@ -296,6 +299,14 @@ class SegmentedScene:
 
                 if(pt_s.point.z > max_z):
                     max_z = pt_s.point.z
+
+
+
+            header = std_msgs.msg.Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = 'map'
+            cur_cluster.raw_segmented_pc = pc2.create_cloud_xyz32(header, raw)
+
 
 
             #if(talk): print("bbox: [" + str(min_x) + "," + str(min_y) + "," +str(min_z) + "," + str(max_x) + "," + str(max_y) + ","+str(max_z)+"]")

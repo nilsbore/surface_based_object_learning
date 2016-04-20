@@ -3,13 +3,13 @@ import rospy
 from sensor_msgs.msg import PointCloud2, PointField
 from cluster_tracker import SOMAClusterTracker
 from world_modeling.srv import *
-from geometry_msgs.msg import Pose
+#from geometry_msgs.msg import Pose
 
 # WS stuff
 from soma_io.observation import Observation, TransformationStore
 from soma_io.geometry import *
 from soma_io.state import World, Object
-from soma_io.geometry import Pose
+import soma_io.geometry as ws_geom
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo, JointState
 
 # SOMA2 stuff
@@ -23,6 +23,8 @@ class WorldStateManager:
         rospy.init_node('world_state_modeling', anonymous = False)
 
         if(talk): print("Manager Online")
+
+    
 
         # make a cluster tracker
         self.world_model = World(server_host="woody",server_port=62345)
@@ -230,14 +232,18 @@ class WorldStateManager:
                     cur_cluster.add_observation(cloud_observation)
 
                     # centroid of this object, in the head_xtion_rgb_optical_frame
-                    pose = Pose()
-                    pose.position.x = cur_scene_cluster.local_centroid[0]
-                    pose.position.y = cur_scene_cluster.local_centroid[1]
-                    pose.position.z = cur_scene_cluster.local_centroid[2]
+                    ws_pose = ws_geom.Pose()
+                    ws_pose.position.x = cur_scene_cluster.local_centroid[0]
+                    ws_pose.position.y = cur_scene_cluster.local_centroid[1]
+                    ws_pose.position.z = cur_scene_cluster.local_centroid[2]
+
+
+                    print("observation made")
+
 
                     #if(talk): print("POSE")
                     #if(talk): print(pose.position)
-                    cur_cluster.add_pose(pose)
+                    cur_cluster.add_pose(ws_pose)
 
                     # store the segmented point cloud for this cluster
                     cloud_observation.add_message(cur_scene_cluster.cloud,"object_cloud")
@@ -248,11 +254,7 @@ class WorldStateManager:
                     # next step: can we classify this object, OR do we have a classification for it already?
 
 
-                    # else
-                        #
-                        # SOMA INTEGRATION
 
-                        # see if we have a soma object by this name
                     soma_objs = self.get_soma_objects_with_id(cur_cluster.key)
                     cur_soma_obj = None
 
@@ -270,15 +272,23 @@ class WorldStateManager:
                         cur_soma_obj.id = cur_cluster.key
 
                         # either way we want to record this, so just do it here?
-                        cur_soma_obj.cloud = cur_scene_cluster.cloud
-                        cur_soma_obj.pose = pose
+                        #cur_soma_obj.cloud = cur_scene_cluster.cloud
+
+                        soma_pose = geometry_msgs.msg.Pose()
+                        soma_pose.position.x = cur_scene_cluster.local_centroid[0]
+                        soma_pose.position.y = cur_scene_cluster.local_centroid[1]
+                        soma_pose.position.z = cur_scene_cluster.local_centroid[2]
+
+                        cur_soma_obj.pose = soma_pose
                         msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
                         cur_soma_obj.sweepCenter = msg
                         # TODO: everything is unknown for now, but later on we'll change this to a
                         # class or instance distribution
                         cur_soma_obj.type = "unknown"
                         print("inserting into SOMA")
-
+                        res = self.soma_insert([cur_soma_obj])
+                        print("result: ")
+                        print(res)
 
 
 
