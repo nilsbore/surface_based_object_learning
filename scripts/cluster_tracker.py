@@ -99,7 +99,7 @@ class BBox():
 class SegmentedCluster:
     def __init__(self,idc,cloud):
         self.data = []
-        self.col_data = []
+        self.colour = []
         self.cloud = cloud
         self.data_world = []
         self.cluster_id = idc
@@ -123,19 +123,54 @@ class SegmentedScene:
                 return True
         return False
 
+    def calculate_centroid(self,points):
+        x = 0
+        y = 0
+        z = 0
+        num = len(points)
+        for point in points:
+            x += point[0]
+            y += point[1]
+            z += point[2]
+
+        x /= num
+        y /= num
+        z /= num
+
+        return [x,y,z]
+
+
+    def calculate_bbox(self,image_msg):
+        cv_image = self.bridge.imgmsg_to_cv2(image_msg, desired_encoding="bgr8")
+        (rows,cols,channels) = cv_image.shape
+        print("img w: " + str(cols) + " img h: " + str(rows))
+
+        for i in range(640):
+            for j in range(480):
+                pixel = cv_image[j][i]
+
+
+
 
     def __init__(self,indices,cloud,listener,col_image,col_cloud):
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.cloud = cloud
+        self.bridge = CvBridge()
 
+        # links the coloured segmented point cloud to the other stuff
         self.col_seg_image = col_image
+
+        self.calculate_bbox(self.col_seg_image)
+
+
         self.col_seg_cloud = pc2.read_points(col_cloud)
-        col_data = list(self.col_seg_cloud)
+        colour_data = list(self.col_seg_cloud)
 
-        colours = set()
+        colours = {}
+        colour_centroids = {}
 
-        for x in col_data:
+        for x in colour_data:
             test = x[3]
             # cast float32 to int so that bitwise operations are possible
             s = struct.pack('>f' ,test)
@@ -147,14 +182,28 @@ class SegmentedScene:
             b = (pack & 0x000000FF)
 
             #print r,g,b # prints r,g,b values in the 0-255 range
-                        # x,y,z can be retrieved from the x[0],x[1],x[2]
-            colours.add((r,g,b))
+            # x,y,z can be retrieved from the x[0],x[1],x[2]
+            if (r,g,b) not in colours.keys():
+                print("added colour: " + str([r,g,b]))
+                colours[(r,g,b)] = []
+
+            colours[(r,g,b)].append([x[0],x[1],x[2]])
+
+        print("found colours: " + str(colours.keys()) +" from cloud")
+
+    #    for key in colours.keys():
+    #        print("FOR THIS KEY: " + str(key))
+    #        print("POINTS ARE: ")
+    #        print(colours[key])
+    #        print("\n\n")
+
+        for key in colours.keys():
+            print("FOR THIS KEY: " + str(key))
+            print("CENTROID IS: ")
+            print(self.calculate_centroid(colours[key]))
+            colour_centroids[key] = self.calculate_centroid(colours[key])
 
 
-
-            
-
-        print("found cols: " + str(colours))
         #print("reading seg mask")
         #self.seg_mask_cloud = pc2.read_points(ccld)
         #print("done")
@@ -274,9 +323,23 @@ class SegmentedScene:
             cur_cluster.map_centroid = np.array((ps_t.point.x ,ps_t.point.y, ps_t.point.z))
             cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
 
+            # which of the known colour centroids is closest to this local_centroid?
+            best = None
+            bdist = 100000
+            for cent in colour_centroids.keys():
+                dist = np.linalg.norm(cur_cluster.local_centroid-colour_centroids[cent])
+                if(dist < bdist):
+                    bdist = dist
+                    best = cent
 
-            if(talk): print("centroid:")
-            if(talk): print(cur_cluster.map_centroid)
+            print("found the best at: " + str(bdist) + " which is col: " + str(best))
+
+            cur_cluster.colour = best
+
+            print("centroid:")
+            print("map centroid:" + str(cur_cluster.map_centroid))
+            print("local centroid:" + str(cur_cluster.local_centroid))
+
             bbox = BBox(min_x,max_x,min_y,max_y,min_z,max_z)
             cur_cluster.bbox = bbox
             if(talk): print("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
