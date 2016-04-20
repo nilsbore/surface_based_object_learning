@@ -363,17 +363,6 @@ class SOMAClusterTracker:
         self.prev_scene = None
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
 
-
-        self.col_img_sub =  rospy.Subscriber("/pcl_segmentation_service/segmented_cloud_colored_img", Image, self.image_cb)
-        self.col_cloud_sub = rospy.Subscriber("/pcl_segmentation_service/segmented_cloud_colored", PointCloud2, self.cloud_cb)
-        print("got it")
-
-    def image_cb(self, img_data):
-        self.cur_seg_color_image = img_data
-
-    def cloud_cb(self, cl_data):
-        self.cur_seg_color_cloud = cl_data
-
     def add_unsegmented_scene(self,data):
         # takes in a SegmentedScene
 
@@ -392,7 +381,7 @@ class SOMAClusterTracker:
 
             #print("zzz")
 
-            new_scene = SegmentedScene(out,data,self.segmentation.listener,self.cur_seg_color_image,self.cur_seg_color_cloud)
+            new_scene = SegmentedScene(out,data,self.segmentation.listener)
 
             if(talk): print("new scene added, with " + str(new_scene.num_clusters) + " clusters")
 
