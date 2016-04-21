@@ -347,28 +347,45 @@ class SegmentedScene:
 
             bbmin = cur_cluster.img_bbox[0]
             bbmax = cur_cluster.img_bbox[1]
+            print("bbmin: " + str(bbmin))
+            print("bbnax: " + str(bbmax))
 
             bbox_width = bbmax[0]-bbmin[0]
             bbox_height = bbmax[1]-bbmin[1]
-            print("w: " + str(bbox_width))
-            print("h: " + str(bbox_height))
 
             # roi = im[y1:y2, x1:x2]
             bx = cur_cluster.img_centroid[0]
             by = cur_cluster.img_centroid[1]
             #
-            bw = 48
-
-            bx -= bw/2
-            by -= bw/2
+            b_w = 64
+            b_h = b_w
 
 
-            cv_image_cropped = cv_image[by:by+bw, bx:bx+bw]
+
+            if(bbox_width > b_w):
+                b_w = bbox_width
+
+            if(bbox_height > b_h):
+                b_h = bbox_height
+
+            bx -= b_w/2
+            by -= b_h/2
+
+            y_targ = by+b_h
+            x_targ = bx+b_w
+
+            if(y_targ > 480):
+                y_targ = 480
+
+            if(x_targ > 640):
+                x_targ = 640
+
+            cv_image_cropped = cv_image[by:y_targ, bx:x_targ]
 
 
             #imid = str(uuid.uuid4())
             success = cv2.imwrite(cid+'.jpeg',cv_image_cropped)
-            print(success)
+            print("cropping succeded:" + str(success))
 
 
 
