@@ -20,6 +20,8 @@ from tf import transformations
 import uuid
 import random
 import image_geometry
+
+
 talk = False
 
 class BBox():
@@ -99,6 +101,7 @@ class BBox():
 class SegmentedCluster:
     def __init__(self,idc,cloud):
         self.data = []
+        self.col_data = []
         self.cloud = cloud
         self.data_world = []
         self.cluster_id = idc
@@ -175,15 +178,47 @@ class SegmentedScene:
         self.num_clusters = len(indices.clusters_indices)
         self.cloud = cloud
 
+        print("transforming point cloud")
+        translation,rotation = listener.lookupTransform("/map", "/head_xtion_rgb_optical_frame", rospy.Time())
+
+
+        #print(translation)
+        #print(rotation)
+
+        print("got it")
+
+        #kdl_stuff = PyKDL.Frame(PyKDL.Rotation.Quaternion(rotation[0], rotation[1], rotation[2], rotation[3]),
+            #           PyKDL.Vector(translation[0],translation[1],translation[2]))
+
+        #print("set up kdl")
+
+        #points_out = []
+    #    print("converting points to map frame")
+        #for p_in in pc2.read_points(cloud):
+        #    p_out = kdl_stuff * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
+        #    colv = [p_out[0],p_out[1],p_out[2],p_in[3]]
+        #    print("in: " + str(p_in))
+        #    print("out: " + str(p_out))
+        #    print("colv: " + str(colv))
+        #    points_out.append(colv)
+
+
+        #header = std_msgs.msg.Header()
+        #header.stamp = rospy.Time.now()
+        #header.frame_id = 'map'
+
+        #self.col_pc2_world = pc2.create_cloud(header, cloud.fields, points_out)
+
+        #print("done")
 
         #print("reading seg mask")
         #self.seg_mask_cloud = pc2.read_points(ccld)
         #print("done")
 
-        #if(talk): print(cloud.header)
         self.raw_cloud = pc2.read_points(cloud)
         int_data = list(self.raw_cloud)
-        #if(talk): print("data: " + str(len(int_data)))
+
+        #col_int_data = list(pc2.read_points(self.col_pc2_world)) # oh my god, do we really have to do this?
 
         self.cluster_list = []
 
@@ -201,6 +236,8 @@ class SegmentedScene:
             #raw = []
             for idx in root_cluster.data:
                 cur_cluster.data.append(int_data[idx])
+                #print("idata: " + str(int_data[idx]))
+                cur_cluster.col_data.append(int_data[idx])
 
             #if(talk): print("i added: " + str(len(cur_cluster.data)) + " points to a cluster")
 
@@ -232,13 +269,13 @@ class SegmentedScene:
             local_max_y = -99999
             local_max_z = -99999
 
-            translation,rotation = listener.lookupTransform("/map", "/head_xtion_rgb_optical_frame", rospy.Time())
+            #translation,rotation = listener.lookupTransform("/map", "/head_xtion_rgb_optical_frame", rospy.Time())
             trans_matrix = np.dot(transformations.translation_matrix(translation), transformations.quaternion_matrix(rotation))
 
             #if(talk): print("got transform: ")
             #if(talk): print(trans_cache[0])
 
-
+            raw = []
             for points in cur_cluster.data:
                 # store the roxe world transformed point too
                 pt_s = PointStamped()
@@ -272,12 +309,13 @@ class SegmentedScene:
                 xyz = tuple(np.dot(trans_matrix, np.array([pt_s.point.x, pt_s.point.y, pt_s.point.z, 1.0])))[:3]
                 pt_s.point = geometry_msgs.msg.Point(*xyz)
 
-                #raw.append((pt_s.point.x,pt_s.point.y,pt_s.point.z))
+                color_data = points[3]
+                #print("color data:" + str(color_data))
+                raw.append((pt_s.point.x,pt_s.point.y,pt_s.point.z,color_data))
+
+
                 cur_cluster.data_world.append(pt_s)
 
-                x += pt_s.point.x
-                y += pt_s.point.y
-                z += pt_s.point.z
 
                 if(pt_s.point.x < min_x):
                     min_x = pt_s.point.x
@@ -321,7 +359,13 @@ class SegmentedScene:
             header = std_msgs.msg.Header()
             header.stamp = rospy.Time.now()
             header.frame_id = 'map'
-            cur_cluster.raw_segmented_pc = pc2.create_cloud(header, cloud.fields, cur_cluster.data)
+            #cur_cluster.raw_segmented_pc = pc2.create_cloud(header, self.col_pc2_world.fields, cur_cluster.col_data)
+
+            cur_cluster.raw_segmented_pc = pc2.create_cloud(header, cloud.fields, raw)
+        #    cur_cluster.raw_segmented_pc = pc2.create_cloud_xyz32(header, raw)
+
+            print("CLOUD HEADER:")
+            print(cloud.header)
 
 
             ps_test = PointStamped()

@@ -250,7 +250,7 @@ class WorldStateManager:
                 cur_cluster.add_pose(ws_pose)
 
                 # store the segmented point cloud for this cluster
-                cloud_observation.add_message(cur_scene_cluster.cloud,"object_cloud")
+                cloud_observation.add_message(cur_scene_cluster.raw_segmented_pc,"object_cloud")
                 # NOTE: Not registered to meta-room yet
 
                 if(talk): print("done")
