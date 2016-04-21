@@ -99,7 +99,6 @@ class BBox():
 class SegmentedCluster:
     def __init__(self,idc,cloud):
         self.data = []
-        self.colour = []
         self.cloud = cloud
         self.data_world = []
         self.cluster_id = idc
@@ -199,7 +198,7 @@ class SegmentedScene:
             cur_cluster = SegmentedCluster(cid,root_cluster)
 
 
-
+            #raw = []
             for idx in root_cluster.data:
                 cur_cluster.data.append(int_data[idx])
 
@@ -239,7 +238,7 @@ class SegmentedScene:
             #if(talk): print("got transform: ")
             #if(talk): print(trans_cache[0])
 
-            raw = []
+
             for points in cur_cluster.data:
                 # store the roxe world transformed point too
                 pt_s = PointStamped()
@@ -273,7 +272,7 @@ class SegmentedScene:
                 xyz = tuple(np.dot(trans_matrix, np.array([pt_s.point.x, pt_s.point.y, pt_s.point.z, 1.0])))[:3]
                 pt_s.point = geometry_msgs.msg.Point(*xyz)
 
-                raw.append((pt_s.point.x,pt_s.point.y,pt_s.point.z))
+                #raw.append((pt_s.point.x,pt_s.point.y,pt_s.point.z))
                 cur_cluster.data_world.append(pt_s)
 
                 x += pt_s.point.x
@@ -322,7 +321,7 @@ class SegmentedScene:
             header = std_msgs.msg.Header()
             header.stamp = rospy.Time.now()
             header.frame_id = 'map'
-            cur_cluster.raw_segmented_pc = pc2.create_cloud_xyz32(header, raw)
+            cur_cluster.raw_segmented_pc = pc2.create_cloud(header, cloud.fields, cur_cluster.data)
 
 
             ps_test = PointStamped()
@@ -345,7 +344,7 @@ class SegmentedScene:
             bbox = BBox(min_x,max_x,min_y,max_y,min_z,max_z)
 
             cur_cluster.bbox = bbox
-            
+
             if(talk): print("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
 
         #    if(talk): print("is centre point in bbox? " + str(cur_cluster.bbox.contains_point(cur_cluster.map_centroid)))
