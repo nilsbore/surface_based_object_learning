@@ -233,7 +233,6 @@ class WorldStateManager:
 
 
                 cloud_observation = Observation.make_observation(DEFAULT_TOPICS)
-                cur_cluster.add_observation(cloud_observation)
 
                 # centroid of this object, in the head_xtion_rgb_optical_frame
                 ws_pose = ws_geom.Pose()
@@ -251,6 +250,11 @@ class WorldStateManager:
 
                 # store the segmented point cloud for this cluster
                 cloud_observation.add_message(cur_scene_cluster.raw_segmented_pc,"object_cloud")
+
+                # store the cropped rgb image for this cluster
+                cloud_observation.add_message(cur_scene_cluster.cropped_image,"object_image")
+                cur_cluster.add_observation(cloud_observation)
+
                 # NOTE: Not registered to meta-room yet
 
                 if(talk): print("done")

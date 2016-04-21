@@ -22,7 +22,7 @@ import random
 import image_geometry
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
-
+import base64
 talk = False
 
 class BBox():
@@ -353,15 +353,16 @@ class SegmentedScene:
             bbox_width = bbmax[0]-bbmin[0]
             bbox_height = bbmax[1]-bbmin[1]
 
-            # roi = im[y1:y2, x1:x2]
+
+            # this next bit isn't very nice, but it crops out the cluster from the image
+            # but, since converting clusters to 2d pixel co-ordinates can be a bit wonky sometimes
+            # it entures that images will always be at least 64x64, or bigger if the clusters
+            # are larger than this in screen co-ordinates.
             bx = cur_cluster.img_centroid[0]
             by = cur_cluster.img_centroid[1]
-            #
+
             b_w = 64
             b_h = b_w
-
-
-
             if(bbox_width > b_w):
                 b_w = bbox_width
 
@@ -382,9 +383,10 @@ class SegmentedScene:
 
             cv_image_cropped = cv_image[by:y_targ, bx:x_targ]
 
+            cur_cluster.cropped_image = bridge.cv2_to_imgmsg(cv_image_cropped, encoding="bgr8")
 
-            #imid = str(uuid.uuid4())
             success = cv2.imwrite(cid+'.jpeg',cv_image_cropped)
+
             print("cropping succeded:" + str(success))
 
 
