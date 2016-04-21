@@ -257,8 +257,6 @@ class WorldStateManager:
 
                 # next step: can we classify this object, OR do we have a classification for it already?
 
-
-
                 soma_objs = self.get_soma_objects_with_id(cur_cluster.key)
                 cur_soma_obj = None
 

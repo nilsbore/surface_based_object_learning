@@ -20,7 +20,8 @@ from tf import transformations
 import uuid
 import random
 import image_geometry
-
+from cv_bridge import CvBridge, CvBridgeError
+import cv2
 
 talk = False
 
@@ -187,6 +188,16 @@ class SegmentedScene:
 
         self.cluster_list = []
 
+        #
+        print("getting image of scene")
+        scene_img = rospy.wait_for_message("/head_xtion/rgb/image_color",  Image, timeout=15.0)
+        bridge = CvBridge()
+        cv_image = bridge.imgmsg_to_cv2(scene_img, desired_encoding="bgr8")
+        print("got it")
+
+
+
+
         if(talk): print("loading clusters")
         for root_cluster in indices.clusters_indices:
             if(talk): print("--- CLUSTER ----")
@@ -196,8 +207,6 @@ class SegmentedScene:
             cid = str(uuid.uuid4()) # str so we can later link it to a soma2 object, which indexes by string
             if(talk): print("randomly assigned temporary cid: " + str(cid))
             cur_cluster = SegmentedCluster(cid,root_cluster)
-
-
             #raw = []
             for idx in root_cluster.data:
                 cur_cluster.data.append(int_data[idx])
@@ -260,6 +269,7 @@ class SegmentedScene:
                 if(pt_s.point.z > local_max_z):
                     local_max_z = pt_s.point.z
 
+
                 if(pt_s.point.x < local_min_x):
                     local_min_x = pt_s.point.x
 
@@ -270,10 +280,13 @@ class SegmentedScene:
                     local_min_z = pt_s.point.z
 
                 xyz = tuple(np.dot(trans_matrix, np.array([pt_s.point.x, pt_s.point.y, pt_s.point.z, 1.0])))[:3]
+                x += xyz[0]
+                y += xyz[1]
+                z += xyz[2]
+
                 pt_s.point = geometry_msgs.msg.Point(*xyz)
 
                 color_data = points[3]
-                #print("color data:" + str(color_data))
                 raw.append((pt_s.point.x,pt_s.point.y,pt_s.point.z,color_data))
 
                 cur_cluster.data_world.append(pt_s)
@@ -287,7 +300,6 @@ class SegmentedScene:
                 if(pt_s.point.z < min_z):
                     min_z = pt_s.point.z
 
-
                 if(pt_s.point.x > max_x):
                     max_x = pt_s.point.x
 
@@ -297,7 +309,7 @@ class SegmentedScene:
                 if(pt_s.point.z > max_z):
                     max_z = pt_s.point.z
 
-            #if(talk): print("bbox: [" + str(min_x) + "," + str(min_y) + "," +str(min_z) + "," + str(max_x) + "," + str(max_y) + ","+str(max_z)+"]")
+            print("3d bbox: [" + str(min_x) + "," + str(min_y) + "," +str(min_z) + "," + str(max_x) + "," + str(max_y) + ","+str(max_z)+"]")
 
             x /= len(cur_cluster.data)
             y /= len(cur_cluster.data)
@@ -326,11 +338,40 @@ class SegmentedScene:
             print(cloud.header)
 
             print("centroid:")
+            # TODO: MAP CENTROID DOESN'T WORK ANY MORE
             print("map centroid:" + str(cur_cluster.map_centroid))
             print("local centroid:" + str(cur_cluster.local_centroid))
 
             cur_cluster.img_centroid = self.calculate_2d_image_centroid(cur_cluster.local_centroid)
             cur_cluster.img_bbox = self.calculate_2d_image_bbox([local_min_x,local_min_y,local_min_z],[local_max_x,local_max_y,local_max_z])
+
+            bbmin = cur_cluster.img_bbox[0]
+            bbmax = cur_cluster.img_bbox[1]
+
+            bbox_width = bbmax[0]-bbmin[0]
+            bbox_height = bbmax[1]-bbmin[1]
+            print("w: " + str(bbox_width))
+            print("h: " + str(bbox_height))
+
+            # roi = im[y1:y2, x1:x2]
+            bx = cur_cluster.img_centroid[0]
+            by = cur_cluster.img_centroid[1]
+            #
+            bw = 48
+
+            bx -= bw/2
+            by -= bw/2
+
+
+            cv_image_cropped = cv_image[by:by+bw, bx:bx+bw]
+
+
+            #imid = str(uuid.uuid4())
+            success = cv2.imwrite(cid+'.jpeg',cv_image_cropped)
+            print(success)
+
+
+
 
             print("img centroid: " + str(cur_cluster.img_centroid))
             print("img bbox: " + str(cur_cluster.img_bbox))
@@ -341,7 +382,7 @@ class SegmentedScene:
 
             if(talk): print("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
 
-        #    if(talk): print("is centre point in bbox? " + str(cur_cluster.bbox.contains_point(cur_cluster.map_centroid)))
+        #   if(talk): print("is centre point in bbox? " + str(cur_cluster.bbox.contains_point(cur_cluster.map_centroid)))
             self.cluster_list.append(cur_cluster)
 
 
