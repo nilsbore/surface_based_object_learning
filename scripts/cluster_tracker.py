@@ -197,9 +197,6 @@ class SegmentedScene:
         cv_image = bridge.imgmsg_to_cv2(scene_img, desired_encoding="bgr8")
         print("got it")
 
-
-
-
         if(talk): print("loading clusters")
         for root_cluster in indices.clusters_indices:
             if(talk): print("--- CLUSTER ----")

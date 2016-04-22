@@ -18,6 +18,9 @@ from sensor_msgs.msg import Image, PointCloud2, CameraInfo, JointState
 from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
 
+# recog stuff
+from recognition_srv_definitions.srv import *
+
 talk = True
 
 class WorldStateManager:
@@ -54,6 +57,14 @@ class WorldStateManager:
         rospy.wait_for_service('soma2/query_db')
         print("done")
         self.soma_get = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
+
+        print("getting recognition service")
+        self.recog_service = rospy.ServiceProxy('/recognition_service/sv_recognition',recognize)
+
+        if(self.recog_service):
+            print("recognition service online")
+        else:
+            print("no recognition service")
 
         #self.world_model.create_object("base_room")
         #rospy.sleep(1.)
@@ -248,14 +259,31 @@ class WorldStateManager:
                 #if(talk): print(pose.position)
                 cur_cluster.add_pose(ws_pose)
 
+            #    print(cur_cluster.identifications)
+
                 # store the segmented point cloud for this cluster
                 cloud_observation.add_message(cur_scene_cluster.raw_segmented_pc,"object_cloud")
 
                 # store the cropped rgb image for this cluster
                 cloud_observation.add_message(cur_scene_cluster.cropped_image,"object_image")
-                cur_cluster.add_observation(cloud_observation)
 
-                # NOTE: Not registered to meta-room yet
+                # TODO: NOW RUN RECOGNITION ON THE OBJECT
+                # TODO: REMOVE THE TIMEOUT HERE
+                print("waiting to get recog service")
+                try:
+                    rs = rospy.wait_for_service('/recognition_service/sv_recognition',0.5)
+                    print("recognition online")
+                    recog_out = self.seg_service(cur_scene_cluster.raw_segmented_pc)
+
+                    # this should give us back #
+                    labels = recog_out.ids
+                    confidences = recog_out.confidence
+                    # this is all we care about #
+                    cloud_observation.recognition = zip(labels,confidences)
+                except Exception, e:
+                    print("recog not online")
+
+                cur_cluster.add_observation(cloud_observation)
 
                 if(talk): print("done")
 

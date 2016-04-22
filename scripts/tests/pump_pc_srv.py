@@ -16,6 +16,7 @@ def cloud_callback(data):
 
 if __name__ == '__main__':
     rospy.init_node('ws_repeater', anonymous = False)
+
     #print("waiting for pc topic")
     #rospy.wait_for_message('/head_xtion/depth_registered/points',PointCloud2)
     #print("got it")
