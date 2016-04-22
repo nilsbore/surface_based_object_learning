@@ -192,7 +192,7 @@ class SegmentedScene:
 
         #
         print("getting image of scene")
-        scene_img = rospy.wait_for_message("/head_xtion/rgb/image_color",  Image, timeout=15.0)
+        scene_img = rospy.wait_for_message("/head_xtion/rgb/image_rect_color",  Image, timeout=15.0)
         bridge = CvBridge()
         cv_image = bridge.imgmsg_to_cv2(scene_img, desired_encoding="bgr8")
         print("got it")
@@ -410,7 +410,9 @@ class SOMAClusterTracker:
 
         # segment the pc
         if(talk): print("waiting for segmentation service")
+        print("segmenting (may take a second)")
         rospy.wait_for_service(self.segmentation_service)
+        print("done")
 
         try:
             out = self.segmentation.seg_service(cloud=data)

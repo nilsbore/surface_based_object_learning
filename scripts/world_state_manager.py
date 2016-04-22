@@ -237,7 +237,7 @@ class WorldStateManager:
                 # add an observation for the object
 
                 # TODO: UNHACK THIS TO INCLUDE ROBOT POSE, DOESN'T WORK IN SIM
-                DEFAULT_TOPICS = [("/head_xtion/rgb/image_color", Image),
+                DEFAULT_TOPICS = [("/head_xtion/rgb/image_rect_color", Image),
                                   ("/head_xtion/rgb/camera_info", CameraInfo),
                                   ("/head_xtion/depth/points", PointCloud2),
                                   ("/head_xtion/depth_registered/camera_info", CameraInfo),
