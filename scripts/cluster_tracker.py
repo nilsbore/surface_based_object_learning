@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField, Image, CameraInfo
@@ -155,7 +157,7 @@ class SegmentedScene:
         #point = tfl.transformPoint("/head_xtion_rgb_optical_frame", ps_test)
 
 
-        bbox_min = model.project3dToPixel((bbmin[0], bbmin[1], bbmin[2]))
+        bbox_min = model.project3dToPixel((bbmin[0], bbmax[1], bbmin[2]))
         bbox_max = model.project3dToPixel((bbmax[0], bbmax[1], bbmax[2]))
         return (bbox_min,bbox_max)
 
@@ -225,21 +227,10 @@ class SegmentedScene:
 
             # initalise some extreme values for finding the dimensions of a
             # bounding rectangle around the object
-            min_x = 99999
-            min_y = 99999
-            min_z = 99999
-
-            max_x = -99999
-            max_y = -99999
-            max_z = -99999
-
-            local_min_x = 99999
-            local_min_y = 99999
-            local_min_z = 99999
-
-            local_max_x = -99999
-            local_max_y = -99999
-            local_max_z = -99999
+            min_x=min_y=min_z=99999
+            max_x=max_y=max_z = -99999
+            local_min_x=local_min_y=local_min_z = 99999
+            local_max_x=local_max_y=local_max_z = -99999
 
             #translation,rotation = listener.lookupTransform("/map", "/head_xtion_rgb_optical_frame", rospy.Time())
             trans_matrix = np.dot(transformations.translation_matrix(translation), transformations.quaternion_matrix(rotation))
@@ -444,7 +435,7 @@ class SOMAClusterTracker:
 
             if(self.prev_scene):
                 if(talk): print("we have a previous observation to compare to")
-                tracker = NaiveClusterTrackingStrategy()
+                tracker = VotingBasedClusterTrackingStrategy()
                 tracker.track(self.cur_scene,self.prev_scene)
             else:
                 if(talk): print("no previous scene to compare to, skipping merging step")

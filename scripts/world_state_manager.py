@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField
@@ -215,7 +217,6 @@ class WorldStateManager:
                 #TODO: do this properly
                 cur_cluster._parent = self.get_cur_metaroom()
 
-
             # from here we've either added this as a new object to the scene
             # or retreived the data for it in a previous scene
             if(cur_cluster):
@@ -223,8 +224,7 @@ class WorldStateManager:
                 if(talk): print("making observation")
                 # add an observation for the object
 
-
-                # TODO: UNHACK THIS TO INCLUDE ROBOT POSE
+                # TODO: UNHACK THIS TO INCLUDE ROBOT POSE, DOESN'T WORK IN SIM
                 DEFAULT_TOPICS = [("/head_xtion/rgb/image_color", Image),
                                   ("/head_xtion/rgb/camera_info", CameraInfo),
                                   ("/head_xtion/depth/points", PointCloud2),
@@ -240,9 +240,7 @@ class WorldStateManager:
                 ws_pose.position.y = cur_scene_cluster.local_centroid[1]
                 ws_pose.position.z = cur_scene_cluster.local_centroid[2]
 
-
                 print("observation made")
-
 
                 #if(talk): print("POSE")
                 #if(talk): print(pose.position)
@@ -329,7 +327,7 @@ class WorldStateManager:
                     #class distribution for this object, retrieve
                         # the SOMA object that matches it
                 else:
-                    if(talk): print("eh")
+                    if(talk): print("got this cluster, not cutting")
 
 if __name__ == '__main__':
     world_state_manager = WorldStateManager()

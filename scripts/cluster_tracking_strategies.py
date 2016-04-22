@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import roslib
 import rospy
 import numpy as np
@@ -31,10 +33,13 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
 
         for cc in cur_scene.cluster_list:
             for cp in prev_scene.cluster_list:
+                # initalise score between these clusters to 0
                 scores[(cc,cp)] = ClusterScore(cc,cp,0)
                 for point in cc.data_world:
                     if(cp.bbox.contains_pointstamped(point.point)):
+                        # increment the score if a point in the current cluster is in the bbox of the previous cluster
                         scores[(cc,cp)].score = scores[(cc,cp)].score+1
+                        #TODO: weight the score if it's closer to the previous centroid?
 
         # normalise scores
         for s in scores:
