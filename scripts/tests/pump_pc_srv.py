@@ -11,7 +11,7 @@ def cloud_callback(data):
     print("republishing")
     out = pub.publish(data)
     #print(data.header)
-    world_update(data)
+    world_update(input=data, obs_type="surface", waypoint="WayPoint32")
     print("done")
 
 if __name__ == '__main__':

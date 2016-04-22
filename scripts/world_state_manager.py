@@ -40,8 +40,6 @@ class WorldStateManager:
         #rospy.wait_for_message('/head_xtion/depth_registered/points',PointCloud2)
         #if(talk): print("got it")
 
-        # callback chain to deal with storing *objects*
-        # self.o_sub = rospy.Subscriber("/head_xtion/depth_registered/points", PointCloud2, self.segment_callback)
         print("setting up service")
         update_world_state = rospy.Service('update_world_model',WorldUpdate,self.segment_callback)
         print("done")
@@ -71,7 +69,6 @@ class WorldStateManager:
         #if(talk): print("done")
         #if(talk): print(obj)
 
-        #live_objects = map(lambda x: x.name, self.world_model.get_children(self.get_cur_metaroom(), {'_life_end': None,}))
         #if(talk): print("Node started, setting any live objects to not-live")
 
         #objs = room.get_children_names()
@@ -111,10 +108,17 @@ class WorldStateManager:
 
         rospy.spin()
 
-    def segment_callback(self,data):
+    def segment_callback(self, req):
+
+        data = req.input
+        waypoint = req.waypoint
+        obs_type = req.obs_type
+
+
+
         print("got data")
         # handles service calls containing point clouds
-        data = data.input
+        self.cur_waypoint = waypoint
 
         if(talk): print("got cloud:" + str(data.header.seq))
         try:
@@ -128,11 +132,11 @@ class WorldStateManager:
 
 
     def cluster_is_live(self,cluster_id):
-        if(talk): print("seeing if object exists:" + str(cluster_id) +" in: " + self.get_cur_metaroom())
+        if(talk): print("seeing if object exists:" + str(cluster_id) +" in: " + self.cur_waypoint)
         exists = self.world_model.does_object_exist(cluster_id)
 
         if(exists):
-            live_objects = map(lambda x: x.name, self.world_model.get_children(self.get_cur_metaroom(), {'_life_end': None,}))
+            live_objects = map(lambda x: x.name, self.world_model.get_children(self.cur_waypoint, {'_life_end': None,}))
             if(talk): print("live objects:" + str(live_objects))
             if(talk): print("cid: " + str(cluster_id))
             if(cluster_id in live_objects):
@@ -144,9 +148,6 @@ class WorldStateManager:
 
     def cluster_exists(self,cluster_id):
         return self.world_model.does_object_exist(cluster_id)
-
-    def get_cur_metaroom(self):
-        return "base_room"
 
     def add_soma_object(self,obj):
         print("getting service")
@@ -215,7 +216,7 @@ class WorldStateManager:
                 if(talk): print("creating object")
                 cur_cluster = self.world_model.create_object(cur_scene_cluster.cluster_id)
                 #TODO: do this properly
-                cur_cluster._parent = self.get_cur_metaroom()
+                cur_cluster._parent = self.cur_waypoint
 
             # from here we've either added this as a new object to the scene
             # or retreived the data for it in a previous scene
@@ -228,6 +229,7 @@ class WorldStateManager:
                 DEFAULT_TOPICS = [("/head_xtion/rgb/image_color", Image),
                                   ("/head_xtion/rgb/camera_info", CameraInfo),
                                   ("/head_xtion/depth/points", PointCloud2),
+                                  ("/head_xtion/depth_registered/camera_info", CameraInfo),
                                   ("/head_xtion/depth/camera_info", CameraInfo),
                                   ("/ptu/state", JointState)]
 
@@ -318,7 +320,7 @@ class WorldStateManager:
                     if(talk): print("object still live, not cutting")
 
             # do some cleanup in case of crashes or some other errors
-            live_objects = map(lambda x: x.name, self.world_model.get_children(self.get_cur_metaroom(), {'_life_end': None,}))
+            live_objects = map(lambda x: x.name, self.world_model.get_children(self.cur_waypoint, {'_life_end': None,}))
             for o in live_objects:
                 if not cur_scene.contains_cluster_id(o):
                     if(talk): print("killing dangling object")
