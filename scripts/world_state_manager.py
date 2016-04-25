@@ -21,6 +21,10 @@ from soma_manager.srv import *
 # recog stuff
 from recognition_srv_definitions.srv import *
 
+# people tracker stuff #
+from bayes_people_tracker import PeopleTracker
+from upper_body_detector import UpperBodyDetector
+
 talk = True
 
 class WorldStateManager:
@@ -126,18 +130,70 @@ class WorldStateManager:
         self.assign_people(pid)
 
 
-    def assign_people():
+    def assign_people(self,pid):
         print("assigning")
         # do we have a low-level object with this key?
             # if so get it out
             # if not, create it
+        cur_person = self.world_model.get_object(pid)
+
+        if(not cur_person):
+            print("creating person entry")
+            cur_person = self.world_model.create_object(pid)
+            cur_person._parent = self.cur_waypoint
+        else:
+            print("got this person already")
+
+
+        # record this observation
+        DEFAULT_TOPICS = [("/head_xtion/rgb/image_rect_color", Image),
+                          ("/head_xtion/depth/image_rect", Image),
+                          ("/robot_pose", geometry_msgs.msg.Pose),
+                          ("/upper_body_detector/detections", UpperBodyDetector),
+                          ("/upper_body_detector/bounding_box_centres", geometry_msgs.msg.PoseArray),
+                          ("/bayes_people_tracker/PeopleTracker", PeopleTracker)]
+
+        person_observation = Observation.make_observation(DEFAULT_TOPICS)
+        cur_person.add_observation(person_observation)
 
         # assign observation to object
-        # TODO: GET TOPICS FROM FERDI
 
         # do we have a SOMA-level object with this key?
             # if so get it out
             # if not, create it
+            soma_objs = self.get_soma_objects_with_id(cur_person.key)
+            cur_soma_person = None
+
+            if(soma_objs.objects):
+                print("soma has this person")
+                # we have a soma object with this id
+                # retrieve it
+                cur_soma_person = soma_objs.objects[0] # will only ever return 1 anyway, as keys are unique
+            else:
+                print("soma doesn't have this person")
+                # if this object is unknown, lets register a new unknown object in SOMA2
+                # we do not have a soma object with this id
+                # create it
+                cur_soma_person = SOMA2Object()
+                cur_soma_person.id = cur_cluster.key
+                cur_soma_person.type = "person"
+
+                # either way we want to record this, so just do it here?
+                #cur_soma_person.cloud = cur_scene_cluster.raw_segmented_pc
+
+                #soma_pose = geometry_msgs.msg.Pose()
+                #soma_pose.position.x = cur_scene_cluster.local_centroid[0]
+                #soma_pose.position.y = cur_scene_cluster.local_centroid[1]
+                #soma_pose.position.z = cur_scene_cluster.local_centroid[2]
+
+                #cur_soma_obj.pose = soma_pose
+                msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
+                cur_soma_person.sweepCenter = msg
+
+                print("inserting into SOMA")
+                res = self.soma_insert([cur_soma_obj])
+                print("result: ")
+                print(res)
 
         # update this object in some way
         # TODO: HOW?
@@ -232,9 +288,7 @@ class WorldStateManager:
         #print("got both prev and cur")
     # get all the cluster IDs from current scene
     # for each cluster in this scene
-        for cur_scene_cluster in cur_scene.cluster_list:
-        # is this a new cluster, or was it in the last scene?
-            cur_cluster = None
+                #TODO: do this properly
 
             if(prev_scene):
                 if(prev_scene.contains_cluster_id(cur_scene_cluster.cluster_id)):
@@ -248,7 +302,6 @@ class WorldStateManager:
             if not cur_cluster:
                 if(talk): print("creating object")
                 cur_cluster = self.world_model.create_object(cur_scene_cluster.cluster_id)
-                #TODO: do this properly
                 cur_cluster._parent = self.cur_waypoint
 
             # from here we've either added this as a new object to the scene
@@ -273,9 +326,9 @@ class WorldStateManager:
 
                 # centroid of this object, in the head_xtion_rgb_optical_frame
                 ws_pose = ws_geom.Pose()
-                ws_pose.position.x = cur_scene_cluster.local_centroid[0]
-                ws_pose.position.y = cur_scene_cluster.local_centroid[1]
-                ws_pose.position.z = cur_scene_cluster.local_centroid[2]
+                ws_pose.position.x = cur_scene_cluster.map_centroid[0]
+                ws_pose.position.y = cur_scene_cluster.map_centroid[1]
+                ws_pose.position.z = cur_scene_cluster.map_centroid[2]
 
                 print("observation made")
 
@@ -289,13 +342,13 @@ class WorldStateManager:
                 cloud_observation.add_message(cur_scene_cluster.raw_segmented_pc,"object_cloud")
 
                 # store the cropped rgb image for this cluster
-                cloud_observation.add_message(cur_scene_cluster.cropped_image,"object_image")
+                cloud_observation.add_message(cur_scene_cluster.cropped_image,"object_image_cropped")
+
 
                 # TODO: NOW RUN RECOGNITION ON THE OBJECT
-                # TODO: REMOVE THE TIMEOUT HERE
                 print("waiting to get recog service")
                 try:
-                    rs = rospy.wait_for_service('/recognition_service/sv_recognition',0.5)
+                    rs = rospy.wait_for_service('/recognition_service/sv_recognition',1)
                     print("recognition online")
                     recog_out = self.seg_service(cur_scene_cluster.raw_segmented_pc)
 
@@ -307,13 +360,9 @@ class WorldStateManager:
                 except Exception, e:
                     print("recog not online")
 
-                cur_cluster.add_observation(cloud_observation)
 
-                if(talk): print("done")
+                    
 
-                # next step: can we classify this object, OR do we have a classification for it already?
-
-                soma_objs = self.get_soma_objects_with_id(cur_cluster.key)
                 cur_soma_obj = None
 
                 if(soma_objs.objects):
@@ -345,11 +394,16 @@ class WorldStateManager:
                     # class or instance distribution
                     print("inserting into SOMA")
                     res = self.soma_insert([cur_soma_obj])
-                    print("result: ")
-                    print(res)
+                    #print("result: ")
+                    #print(res)
+                except Exception, e:
+                    print("recog not online")
 
+                cur_cluster.add_observation(cloud_observation)
 
+                if(talk): print("done")
 
+                # next step: can we classify this object, OR do we have a classification for it already?
             # next we need to clean up the scene, and mark anything no longer observable
             # as not live
             if(prev_scene):

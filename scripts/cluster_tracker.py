@@ -272,11 +272,12 @@ class SegmentedScene:
                 y += xyz[1]
                 z += xyz[2]
 
+                # transform to map co-ordinates
                 pt_s.point = geometry_msgs.msg.Point(*xyz)
 
                 color_data = points[3]
                 raw.append((pt_s.point.x,pt_s.point.y,pt_s.point.z,color_data))
-
+                
                 cur_cluster.data_world.append(pt_s)
 
                 if(pt_s.point.x < min_x):
