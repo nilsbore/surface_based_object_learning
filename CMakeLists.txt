@@ -55,6 +55,7 @@ find_package(catkin REQUIRED COMPONENTS
  add_service_files(
    FILES
     WorldUpdate.srv
+    PersonUpdate.srv
 #   Service2.srv
  )
 

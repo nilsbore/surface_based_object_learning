@@ -22,8 +22,8 @@ from soma_manager.srv import *
 from recognition_srv_definitions.srv import *
 
 # people tracker stuff #
-from bayes_people_tracker import PeopleTracker
-from upper_body_detector import UpperBodyDetector
+from bayes_people_tracker.msg import PeopleTracker
+from upper_body_detector.msg import UpperBodyDetector
 
 talk = True
 
@@ -153,47 +153,43 @@ class WorldStateManager:
                           ("/upper_body_detector/bounding_box_centres", geometry_msgs.msg.PoseArray),
                           ("/bayes_people_tracker/PeopleTracker", PeopleTracker)]
 
+
+
         person_observation = Observation.make_observation(DEFAULT_TOPICS)
         cur_person.add_observation(person_observation)
 
-        # assign observation to object
 
-        # do we have a SOMA-level object with this key?
-            # if so get it out
-            # if not, create it
-            soma_objs = self.get_soma_objects_with_id(cur_person.key)
-            cur_soma_person = None
+        people_tracker_output = person_observation.get_message("/bayes_people_tracker/PeopleTracker")
+        # get the idx of the thing we want
+        person_idx = people_tracker_output.uuids.index(pid)
 
-            if(soma_objs.objects):
-                print("soma has this person")
-                # we have a soma object with this id
-                # retrieve it
-                cur_soma_person = soma_objs.objects[0] # will only ever return 1 anyway, as keys are unique
-            else:
-                print("soma doesn't have this person")
-                # if this object is unknown, lets register a new unknown object in SOMA2
-                # we do not have a soma object with this id
-                # create it
-                cur_soma_person = SOMA2Object()
-                cur_soma_person.id = cur_cluster.key
-                cur_soma_person.type = "person"
+        soma_objs=self.get_soma_objects_with_id(cur_person.key)
+        cur_soma_person = None
 
-                # either way we want to record this, so just do it here?
-                #cur_soma_person.cloud = cur_scene_cluster.raw_segmented_pc
+        if(soma_objs.objects):
+            print("soma has this person")
+            # we have a soma object with this id
+            # retrieve it
+            cur_soma_person = soma_objs.objects[0] # will only ever return 1 anyway, as keys are unique
+        else:
+            print("soma doesn't have this person")
+            # if this object is unknown, lets register a new unknown object in SOMA2
+            # we do not have a soma object with this id
+            # create it
+            cur_soma_person = SOMA2Object()
+            cur_soma_person.id = cur_person.key
+            cur_soma_person.type = "person"
 
-                #soma_pose = geometry_msgs.msg.Pose()
-                #soma_pose.position.x = cur_scene_cluster.local_centroid[0]
-                #soma_pose.position.y = cur_scene_cluster.local_centroid[1]
-                #soma_pose.position.z = cur_scene_cluster.local_centroid[2]
+            # either way we want to record this, so just do it here?
+            #cur_soma_person.cloud = cur_scene_cluster.raw_segmented_pc
 
-                #cur_soma_obj.pose = soma_pose
-                msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
-                cur_soma_person.sweepCenter = msg
+            cur_soma_person.pose = people_tracker_output.poses[person_idx]
 
-                print("inserting into SOMA")
-                res = self.soma_insert([cur_soma_obj])
-                print("result: ")
-                print(res)
+            msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
+            cur_soma_person.sweepCenter = msg
+
+            print("inserting person detection into SOMA")
+            res = self.soma_insert([cur_soma_obj])
 
         # update this object in some way
         # TODO: HOW?
@@ -342,11 +338,8 @@ class WorldStateManager:
                 cloud_observation.add_message(cur_scene_cluster.raw_segmented_pc,"object_cloud")
 
                 # store the cropped rgb image for this cluster
-                cloud_observation.add_message(cur_scene_cluster.cropped_image,"object_image_cropped")
-
-
-                # TODO: NOW RUN RECOGNITION ON THE OBJECT
-                print("waiting to get recog service")
+                print("result: ")
+                print(res)
                 try:
                     rs = rospy.wait_for_service('/recognition_service/sv_recognition',1)
                     print("recognition online")
@@ -361,7 +354,8 @@ class WorldStateManager:
                     print("recog not online")
 
 
-                    
+
+                cur_cluster.add_observation(cloud_observation)
 
                 cur_soma_obj = None
 
@@ -375,6 +369,7 @@ class WorldStateManager:
                     # if this object is unknown, lets register a new unknown object in SOMA2
                     # we do not have a soma object with this id
                     # create it
+                try:
                     cur_soma_obj = SOMA2Object()
                     cur_soma_obj.id = cur_cluster.key
                     cur_soma_obj.type = "unknown"
@@ -399,11 +394,10 @@ class WorldStateManager:
                 except Exception, e:
                     print("recog not online")
 
-                cur_cluster.add_observation(cloud_observation)
 
                 if(talk): print("done")
 
-                # next step: can we classify this object, OR do we have a classification for it already?
+
             # next we need to clean up the scene, and mark anything no longer observable
             # as not live
             if(prev_scene):
