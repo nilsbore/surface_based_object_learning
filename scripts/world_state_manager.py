@@ -43,9 +43,11 @@ class WorldStateManager:
         #rospy.wait_for_message('/head_xtion/depth_registered/points',PointCloud2)
         #if(talk): print("got it")
 
-        print("setting up service")
-        update_world_state = rospy.Service('update_world_model',WorldUpdate,self.segment_callback)
-        print("done")
+        print("setting up services")
+        update_world_state = rospy.Service('update_world_model',WorldUpdate,self.object_segment_callback)
+        print("world update service running")
+        update_person_state = rospy.Service('update_person_model',PersonUpdate,self.person_segment_callback)
+        print("person update service running")
 
         print("setting up SOMA services")
         print("getting insert service")
@@ -119,13 +121,33 @@ class WorldStateManager:
 
         rospy.spin()
 
-    def segment_callback(self, req):
+    def person_segment_callback(self,req):
+        pid = req.id
+        self.assign_people(pid)
+
+
+    def assign_people():
+        print("assigning")
+        # do we have a low-level object with this key?
+            # if so get it out
+            # if not, create it
+
+        # assign observation to object
+        # TODO: GET TOPICS FROM FERDI
+
+        # do we have a SOMA-level object with this key?
+            # if so get it out
+            # if not, create it
+
+        # update this object in some way
+        # TODO: HOW?
+
+
+    def object_segment_callback(self, req):
 
         data = req.input
         waypoint = req.waypoint
         obs_type = req.obs_type
-
-
 
         print("got data")
         # handles service calls containing point clouds
@@ -241,8 +263,10 @@ class WorldStateManager:
                                   ("/head_xtion/rgb/camera_info", CameraInfo),
                                   ("/head_xtion/depth/points", PointCloud2),
                                   ("/head_xtion/depth_registered/camera_info", CameraInfo),
+                                  ("/head_xtion/depth_registered/points", PointCloud2)
                                   ("/head_xtion/depth/camera_info", CameraInfo),
-                                  ("/ptu/state", JointState)]
+                                  ("/ptu/state", JointState)
+                                  ("/robot_pose", geometry_msgs.msg.Pose)]
 
 
                 cloud_observation = Observation.make_observation(DEFAULT_TOPICS)
