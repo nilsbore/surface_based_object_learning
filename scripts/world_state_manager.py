@@ -2,6 +2,8 @@
 
 import roslib
 import rospy
+import sys
+import argparse
 from sensor_msgs.msg import PointCloud2, PointField
 from cluster_tracker import SOMAClusterTracker
 from world_modeling.srv import *
@@ -28,12 +30,12 @@ from upper_body_detector.msg import UpperBodyDetector
 talk = True
 
 class WorldStateManager:
-    def __init__(self):
+    def __init__(self,db_hostname,db_port):
         rospy.init_node('world_state_modeling', anonymous = False)
 
         if(talk): print("Manager Online")
         # make a cluster tracker
-        self.world_model = World(server_host="woody",server_port=62345)
+        self.world_model = World(server_host=db_hostname,server_port=int(db_port))
         if(talk): print("world model done")
 
         self.cluster_tracker = SOMAClusterTracker()
@@ -389,4 +391,21 @@ class WorldStateManager:
                 if(talk): print("got this cluster, not cutting")
 
 if __name__ == '__main__':
-    world_state_manager = WorldStateManager()
+
+    s = rospy.get_param('~db_hostname', 'default_value')
+    print(s)
+
+    parser = argparse.ArgumentParser(prog='world_state_manager.py')
+    parser.add_argument("db_hostname", nargs=1, help='DB Hostname')
+    parser.add_argument('db_port', nargs=1, help="DB Port")
+
+    args = parser.parse_args(rospy.myargv(argv=sys.argv)[1:])
+
+    if(len(sys.argv) < 2):
+        print("not enough args, need db hostname and port")
+    else:
+        hostname = str(vars(args)['db_hostname'][0])
+        port = str(vars(args)['db_port'][0])
+
+        print("got db_hostname as: " + hostname + " got db_port as: " + port)
+        world_state_manager = WorldStateManager(hostname,port)

@@ -1,0 +1,9 @@
+<launch>
+	<!-- pcl segmentation Service -->
+
+	<arg name="db_hostname" default="woody" />
+	<arg name="db_port" default="62345" />
+
+	<node name="world_state_manager" pkg="world_modeling" type="world_state_manager.py" args="$(arg db_hostname) $(arg db_port)" output="screen"/>
+
+</launch>
