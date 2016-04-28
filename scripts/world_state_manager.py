@@ -150,7 +150,7 @@ class WorldStateManager:
     def object_segment_callback(self, req):
 
         data = req.input
-        waypoint = req.waypoint
+        self.cur_waypoint = req.waypoint
 
         print("got data")
         # handles service calls containing point clouds
@@ -328,6 +328,7 @@ class WorldStateManager:
                     cur_soma_obj = SOMA2Object()
                     cur_soma_obj.id = cur_cluster.key
                     cur_soma_obj.type = "unknown"
+                    cur_soma_obj.waypoint = self.cur_waypoint
 
                     # either way we want to record this, so just do it here?
                     cur_soma_obj.cloud = cur_scene_cluster.raw_segmented_pc
