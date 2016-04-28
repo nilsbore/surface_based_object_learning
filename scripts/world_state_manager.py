@@ -131,6 +131,7 @@ class WorldStateManager:
             cur_soma_person = SOMA2Object()
             cur_soma_person.id = cur_person.key
             cur_soma_person.type = "person"
+            cur_soma_person.waypoint = self.cur_waypoint
 
             # either way we want to record this, so just do it here?
             #cur_soma_person.cloud = cur_scene_cluster.raw_segmented_pc
@@ -154,7 +155,7 @@ class WorldStateManager:
 
         print("got data")
         # handles service calls containing point clouds
-        self.cur_waypoint = waypoint
+        self.cur_waypoint = req.waypoint
 
         if(talk): print("got cloud:" + str(data.header.seq))
         try:
