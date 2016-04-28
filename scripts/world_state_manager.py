@@ -197,8 +197,6 @@ class WorldStateManager:
 
 
     def get_soma_objects_with_id(self,id):
-
-
         query = SOMA2QueryObjsRequest()
 
         query.query_type = 0
