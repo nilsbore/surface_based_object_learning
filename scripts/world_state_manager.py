@@ -237,6 +237,10 @@ class WorldStateManager:
     # for each cluster in this scene
                 #TODO: do this properly
 
+        for cur_scene_cluster in cur_scene.cluster_list:
+
+            cur_cluster = None
+
             if(prev_scene):
                 if(prev_scene.contains_cluster_id(cur_scene_cluster.cluster_id)):
                     # do we have a living world model for this cluster already?
@@ -263,9 +267,9 @@ class WorldStateManager:
                                   ("/head_xtion/rgb/camera_info", CameraInfo),
                                   ("/head_xtion/depth/points", PointCloud2),
                                   ("/head_xtion/depth_registered/camera_info", CameraInfo),
-                                  ("/head_xtion/depth_registered/points", PointCloud2)
+                                  ("/head_xtion/depth_registered/points", PointCloud2),
                                   ("/head_xtion/depth/camera_info", CameraInfo),
-                                  ("/ptu/state", JointState)
+                                  ("/ptu/state", JointState),
                                   ("/robot_pose", geometry_msgs.msg.Pose)]
 
 
@@ -304,11 +308,11 @@ class WorldStateManager:
                 except Exception, e:
                     print("recog not online")
 
-
-
                 cur_cluster.add_observation(cloud_observation)
 
                 cur_soma_obj = None
+
+                soma_objs = self.get_soma_objects_with_id(cur_cluster.key)
 
                 if(soma_objs.objects):
                     print("soma has this object")
@@ -349,38 +353,38 @@ class WorldStateManager:
                 if(talk): print("done")
 
 
-            # next we need to clean up the scene, and mark anything no longer observable
-            # as not live
-            if(prev_scene):
-                for prev_scene_cluster in prev_scene.cluster_list:
-                    # if the cluster observed in the previous scene is not in the current scene
-                    if not cur_scene.contains_cluster_id(prev_scene_cluster.cluster_id):
-                        if(talk): print("cutting object")
-                        # set the internal model to not live
-                        try:
-                            prev_cluster = self.world_model.get_object(prev_scene_cluster.cluster_id)
-                            prev_cluster.cut()
-                        except Exception, e:
-                            # we don't even relaly care about this, if it's not in the db
-                            # we're actually good to go
-                            print("error:")
-                            print(e)
-                            print("^^^")
+        # next we need to clean up the scene, and mark anything no longer observable
+        # as not live
+        if(prev_scene):
+            for prev_scene_cluster in prev_scene.cluster_list:
+                # if the cluster observed in the previous scene is not in the current scene
+                if not cur_scene.contains_cluster_id(prev_scene_cluster.cluster_id):
+                    if(talk): print("cutting object")
+                    # set the internal model to not live
+                    try:
+                        prev_cluster = self.world_model.get_object(prev_scene_cluster.cluster_id)
+                        prev_cluster.cut()
+                    except Exception, e:
+                        # we don't even relaly care about this, if it's not in the db
+                        # we're actually good to go
+                        print("error:")
+                        print(e)
+                        print("^^^")
 
-                else:
-                    if(talk): print("object still live, not cutting")
+            else:
+                if(talk): print("object still live, not cutting")
 
-            # do some cleanup in case of crashes or some other errors
-            live_objects = map(lambda x: x.name, self.world_model.get_children(self.cur_waypoint, {'_life_end': None,}))
-            for o in live_objects:
-                if not cur_scene.contains_cluster_id(o):
-                    if(talk): print("killing dangling object")
-                    dangling_obj = self.world_model.get_object(o)
-                    dangling_obj.cut()
-                    #class distribution for this object, retrieve
-                        # the SOMA object that matches it
-                else:
-                    if(talk): print("got this cluster, not cutting")
+        # do some cleanup in case of crashes or some other errors
+        live_objects = map(lambda x: x.name, self.world_model.get_children(self.cur_waypoint, {'_life_end': None,}))
+        for o in live_objects:
+            if not cur_scene.contains_cluster_id(o):
+                if(talk): print("killing dangling object")
+                dangling_obj = self.world_model.get_object(o)
+                dangling_obj.cut()
+                #class distribution for this object, retrieve
+                    # the SOMA object that matches it
+            else:
+                if(talk): print("got this cluster, not cutting")
 
 if __name__ == '__main__':
     world_state_manager = WorldStateManager()
