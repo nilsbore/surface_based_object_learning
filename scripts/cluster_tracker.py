@@ -191,11 +191,11 @@ class SegmentedScene:
         self.cluster_list = []
 
         #
-        print("getting image of scene")
-        scene_img = rospy.wait_for_message("/head_xtion/rgb/image_rect_color",  Image, timeout=15.0)
-        bridge = CvBridge()
-        cv_image = bridge.imgmsg_to_cv2(scene_img, desired_encoding="bgr8")
-        print("got it")
+        #print("getting image of scene")
+        #scene_img = rospy.wait_for_message("/head_xtion/rgb/image_rect_color",  Image, timeout=15.0)
+        #bridge = CvBridge()
+        #cv_image = bridge.imgmsg_to_cv2(scene_img, desired_encoding="bgr8")
+        #print("got it")
 
         if(talk): print("loading clusters")
         for root_cluster in indices.clusters_indices:
@@ -370,15 +370,13 @@ class SegmentedScene:
             if(x_targ > 640):
                 x_targ = 640
 
-            cv_image_cropped = cv_image[by:y_targ, bx:x_targ]
+            #cv_image_cropped = cv_image[by:y_targ, bx:x_targ]
 
-            cur_cluster.cropped_image = bridge.cv2_to_imgmsg(cv_image_cropped, encoding="bgr8")
+            #cur_cluster.cropped_image = bridge.cv2_to_imgmsg(cv_image_cropped, encoding="bgr8")
 
-            success = cv2.imwrite(cid+'.jpeg',cv_image_cropped)
+            #success = cv2.imwrite(cid+'.jpeg',cv_image_cropped)
 
-            print("cropping succeded:" + str(success))
-
-
+            #print("cropping succeded:" + str(success))
 
 
             print("img centroid: " + str(cur_cluster.img_centroid))

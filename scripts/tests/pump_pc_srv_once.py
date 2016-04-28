@@ -26,7 +26,5 @@ if __name__ == '__main__':
     print("done")
 
     print("executing service call")
-    world_update(input=cloud,waypoint="WayPoint32")   
+    world_update(input=cloud,waypoint="WayPoint32")
     print("done")
-
-    rospy.spin()

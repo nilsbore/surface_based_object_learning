@@ -41,6 +41,7 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                         scores[(cc,cp)].score = scores[(cc,cp)].score+1
                         #TODO: weight the score if it's closer to the previous centroid?
 
+        print("raw scores")
         # normalise scores
         for s in scores:
             scores[s].score = (float)(scores[s].score)/(len(scores[s].one.data_world))
@@ -54,9 +55,10 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                 for j in scores:
                     if(scores[j].one == cur):
                         can = scores[j].two
-                        if(scores[j].score > scores[i].score):
+                        if(scores[j].score >= scores[i].score):
                             best_score = scores[j].score
                             best_cluster = can
+
                 if(best_cluster != None):
                     if(self.talk): print("best score for: " + str(cur_scene.cluster_list.index(cur))  + " is: " + str(best_score) +" at best cluster: " + str(prev_scene.cluster_list.index(best_cluster)))
                     scores[i].one.assigned = True

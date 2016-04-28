@@ -354,11 +354,11 @@ class WorldStateManager:
 
         # next we need to clean up the scene, and mark anything no longer observable
         # as not live
-        if(prev_scene):
+        if(prev_scene and cur_scene):
             for prev_scene_cluster in prev_scene.cluster_list:
                 # if the cluster observed in the previous scene is not in the current scene
                 if not cur_scene.contains_cluster_id(prev_scene_cluster.cluster_id):
-                    if(talk): print("cutting object")
+                    if(talk): print("cutting object from previous scene")
                     # set the internal model to not live
                     try:
                         prev_cluster = self.world_model.get_object(prev_scene_cluster.cluster_id)
