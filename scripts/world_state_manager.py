@@ -338,8 +338,8 @@ class WorldStateManager:
                 cloud_observation.add_message(cur_scene_cluster.raw_segmented_pc,"object_cloud")
 
                 # store the cropped rgb image for this cluster
-                print("result: ")
-                print(res)
+            #    print("result: ")
+            #    print(res)
                 try:
                     rs = rospy.wait_for_service('/recognition_service/sv_recognition',1)
                     print("recognition online")
