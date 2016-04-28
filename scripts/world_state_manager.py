@@ -233,12 +233,9 @@ class WorldStateManager:
 
         if not cur_scene:
             print("don't have cur")
+            print("did segmentation fail?")
+            return
 
-        #if(prev_scene and cur_scene):
-        #print("got both prev and cur")
-    # get all the cluster IDs from current scene
-    # for each cluster in this scene
-                #TODO: do this properly
 
         for cur_scene_cluster in cur_scene.cluster_list:
 
