@@ -199,7 +199,6 @@ class WorldStateManager:
 
         data = req.input
         waypoint = req.waypoint
-        obs_type = req.obs_type
 
         print("got data")
         # handles service calls containing point clouds
