@@ -72,56 +72,8 @@ class WorldStateManager:
         else:
             print("no recognition service")
 
-        #self.world_model.create_object("base_room")
-        #rospy.sleep(1.)
+        print("-- node setup completed --")
 
-        #room = self.world_model.get_object("base_room")
-        #if(talk): print(room)
-
-        #if(talk): print("done if(talk): printing room")
-
-        #if(talk): print("getting obj")
-        #obj = self.world_model.get_object("test_object")
-        #obj._parent = room.name
-        #if(talk): print("done")
-        #if(talk): print(obj)
-
-        #if(talk): print("Node started, setting any live objects to not-live")
-
-        #objs = room.get_children_names()
-        #if(talk): print(obj)
-
-        #if(talk): print("doing something esle")
-    #   d = self.world_model.get_children(self.room_name, {'_life_end': -1})
-        #if(talk): print(d)
-
-        #obj._parent = room.name
-
-        #if(talk): print("done")children(self.room_name, {'_life_end': None,}))
-
-        #if(talk): print(live_objects)
-
-        # send the point cloud to the tracker
-
-        # get back some clusters
-
-        # SCENE CONSISTENCY
-        # see if these clusters should be tagged to existing live objects in the world state
-            # are there any live objects?
-            # yes: see if we can assign current clusters to them
-            # no: see if we can create some new live objects from the clusters we have
-
-        # set old objects not in the scene to not live
-
-        # if so, add new observation of existing clusters, keep them live
-
-        # create new object?
-
-        # OBJECT LABELING
-
-        # see if we can run a classifier on any existing clusters
-
-        # add any label to the world object
 
         rospy.spin()
 

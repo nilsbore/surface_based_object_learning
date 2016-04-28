@@ -277,7 +277,7 @@ class SegmentedScene:
 
                 color_data = points[3]
                 raw.append((pt_s.point.x,pt_s.point.y,pt_s.point.z,color_data))
-                
+
                 cur_cluster.data_world.append(pt_s)
 
                 if(pt_s.point.x < min_x):
@@ -323,8 +323,8 @@ class SegmentedScene:
             header.frame_id = 'map'
             cur_cluster.raw_segmented_pc = pc2.create_cloud(header, cloud.fields, raw)
 
-            print("CLOUD HEADER:")
-            print(cloud.header)
+            #print("CLOUD HEADER:")
+            #print(cloud.header)
 
             print("centroid:")
             # TODO: MAP CENTROID DOESN'T WORK ANY MORE
