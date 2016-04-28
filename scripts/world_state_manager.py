@@ -128,7 +128,7 @@ class WorldStateManager:
     def person_segment_callback(self,req):
         pid = req.id
         self.assign_people(pid)
-
+        return PersonUpdateResponse(True)
 
     def assign_people(self,pid):
         print("assigning")
