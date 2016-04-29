@@ -389,10 +389,6 @@ class WorldStateManager:
                 if(talk): print("got this cluster, not cutting")
 
 if __name__ == '__main__':
-
-    s = rospy.get_param('~db_hostname', 'default_value')
-    print(s)
-
     parser = argparse.ArgumentParser(prog='world_state_manager.py')
     parser.add_argument("db_hostname", nargs=1, help='DB Hostname')
     parser.add_argument('db_port', nargs=1, help="DB Port")
