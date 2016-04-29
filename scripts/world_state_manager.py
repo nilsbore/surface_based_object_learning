@@ -346,7 +346,7 @@ class WorldStateManager:
                     #print("result: ")
                     #print(res)
                 except Exception, e:
-                    print("recog not online")
+                    print("unable to insert into SOMA. Is the database server running?")
 
 
                 if(talk): print("done")
