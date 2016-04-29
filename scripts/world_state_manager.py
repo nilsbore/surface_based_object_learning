@@ -377,11 +377,14 @@ class WorldStateManager:
         live_objects = map(lambda x: x.name, self.world_model.get_children(self.cur_waypoint, {'_life_end': None,}))
         for o in live_objects:
             if not cur_scene.contains_cluster_id(o):
-                if(talk): print("killing dangling object")
-                dangling_obj = self.world_model.get_object(o)
-                dangling_obj.cut()
-                #class distribution for this object, retrieve
-                    # the SOMA object that matches it
+                if(talk): print("attempting to kill dangling object...")
+                try:
+                    dangling_obj = self.world_model.get_object(o)
+                    dangling_obj.cut()
+                    if(talk): print("success")
+                except rospy.ServiceException, e:
+                    if(talk): print "failed to cut dangling object, is the database server OK?"
+
             else:
                 if(talk): print("got this cluster, not cutting")
 
