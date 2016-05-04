@@ -31,20 +31,23 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
 
         scores = {}
 
-        for cc in cur_scene.cluster_list:
-            for cp in prev_scene.cluster_list:
+        for cur_cluster in cur_scene.cluster_list:
+            for prev_cluster in prev_scene.cluster_list:
                 # initalise score between these clusters to 0
-                scores[(cc,cp)] = ClusterScore(cc,cp,0)
-                for point in cc.data_world:
-                    if(cp.bbox.contains_pointstamped(point.point)):
+                scores[(cur_cluster,prev_cluster)] = ClusterScore(cur_cluster,prev_cluster,0)
+                for point in cur_cluster.data_world:
+                    if(prev_cluster.bbox.contains_pointstamped(point.point)):
                         # increment the score if a point in the current cluster is in the bbox of the previous cluster
-                        scores[(cc,cp)].score = scores[(cc,cp)].score+1
-                        #TODO: weight the score if it's closer to the previous centroid?
+                        scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
+                        if(prev_cluster.outer_core_bbox.contains_pointstamped(point.point)):
+                            print("point is in outer core!")
+                            scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
 
         print("raw scores")
         # normalise scores
         for s in scores:
             scores[s].score = (float)(scores[s].score)/(len(scores[s].one.data_world))
+            print(str(scores[s].score))
 
         # assign cluster
         for i in scores:
@@ -56,8 +59,9 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                     if(scores[j].one == cur):
                         can = scores[j].two
                         if(scores[j].score >= scores[i].score):
-                            best_score = scores[j].score
-                            best_cluster = can
+                            if(scores[j].score > 0):
+                                best_score = scores[j].score
+                                best_cluster = can
 
                 if(best_cluster != None):
                     if(self.talk): print("best score for: " + str(cur_scene.cluster_list.index(cur))  + " is: " + str(best_score) +" at best cluster: " + str(prev_scene.cluster_list.index(best_cluster)))
@@ -67,7 +71,8 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                     cur.cluster_id = best_cluster.cluster_id
                     if(self.talk): print("that cluster UUID is: " + str(best_cluster.cluster_id))
                 else:
-                    if(self.talk): print("Couldn't find a good cluster")
+                    if(self.talk): print("Couldn't find a good cluster for cluster: " + scores[i].one.cluster_id)
+                    if(self.talk): print("(May be a brand new segment, or incomparable to previously seen segments)")
 
 class ClusterScore:
     def __init__(self,one,two,score):

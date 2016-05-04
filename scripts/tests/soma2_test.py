@@ -29,7 +29,7 @@ if __name__ == '__main__':
     query.useweekday =  False
     query.useroi =  False
 
-    query.objectids = (["hello"])
+    query.objectids = (["5c7637df-4c38-41a2-9a60-5f7554741cf4"])
     query.objecttypes=['']
 
     response = soma_query(query)
@@ -37,15 +37,15 @@ if __name__ == '__main__':
 
     if not response.objects:
         print("empty!")
-
-    #print(response.objects[0])
+    else:
+        print(response.objects[0])
 
 
     print("done")
 
 
-    msg = rospy.wait_for_message("/robot_pose", geometry_msgs.msg.Pose, timeout=3.0)
-    print(msg)
+    #msg = rospy.wait_for_message("/robot_pose", geometry_msgs.msg.Pose, timeout=3.0)
+    #print(msg)
 
     #print("trying to insert")
     #soma_insert = rospy.ServiceProxy('soma2/insert_objects',SOMA2InsertObjs)

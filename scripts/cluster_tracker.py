@@ -143,33 +143,12 @@ class SegmentedScene:
 
         return [x,y,z]
 
-    #
-    # This whole method is a bunch of horrible hacks, please look away
-    #
-    def calculate_2d_image_bbox(self,bbmin,bbmax):
+
+    def calculate_2d_image_centroid(self,centroid):
         model = image_geometry.PinholeCameraModel()
         print("waiting for camera")
         camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=3.0)
         model.fromCameraInfo(camera_msg)
-        #print("got it")
-        #tfl = tf.TransformListener()
-        # this might be wrong
-        #point = tfl.transformPoint("/head_xtion_rgb_optical_frame", ps_test)
-
-
-        bbox_min = model.project3dToPixel((bbmin[0], bbmax[1], bbmin[2]))
-        bbox_max = model.project3dToPixel((bbmax[0], bbmax[1], bbmax[2]))
-        return (bbox_min,bbox_max)
-
-
-    def calculate_2d_image_centroid(self,centroid):
-        model = image_geometry.PinholeCameraModel()
-        camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=3.0)
-        model.fromCameraInfo(camera_msg)
-        #print("got it")
-        #tfl = tf.TransformListener()
-        # this might be wrong
-        #point = tfl.transformPoint("/head_xtion_rgb_optical_frame", ps_test)
         px = model.project3dToPixel((centroid[0], centroid[1], centroid[2]))
         return px
 
@@ -191,11 +170,11 @@ class SegmentedScene:
         self.cluster_list = []
 
         #
-        #print("getting image of scene")
-        #scene_img = rospy.wait_for_message("/head_xtion/rgb/image_rect_color",  Image, timeout=15.0)
-        #bridge = CvBridge()
-        #cv_image = bridge.imgmsg_to_cv2(scene_img, desired_encoding="bgr8")
-        #print("got it")
+        print("getting image of scene")
+        scene_img = rospy.wait_for_message("/head_xtion/rgb/image_rect_color",  Image, timeout=15.0)
+        bridge = CvBridge()
+        cv_image = bridge.imgmsg_to_cv2(scene_img, desired_encoding="bgr8")
+        print("got it")
 
         if(talk): print("loading clusters")
         for root_cluster in indices.clusters_indices:
@@ -236,6 +215,18 @@ class SegmentedScene:
             #if(talk): print(trans_cache[0])
 
             raw = []
+
+            model = image_geometry.PinholeCameraModel()
+            print("waiting for camera")
+            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=3.0)
+            model.fromCameraInfo(camera_msg)
+
+            rgb_min_x = 90000
+            rgb_max_x = 0
+
+            rgb_min_y = 90000
+            rgb_max_y = 0
+
             for points in cur_cluster.data:
                 # store the roxe world transformed point too
                 pt_s = PointStamped()
@@ -243,6 +234,26 @@ class SegmentedScene:
                 pt_s.point.x = points[0]
                 pt_s.point.y = points[1]
                 pt_s.point.z = points[2]
+
+                # get the rgb pos of the point
+                rgb_point = model.project3dToPixel((pt_s.point.x, pt_s.point.y, pt_s.point.z))
+                #print("rgb point: " + str(rgb_point))
+
+                rgb_x = rgb_point[0]
+                rgb_y = rgb_point[1]
+
+                if(rgb_x < rgb_min_x):
+                    rgb_min_x = rgb_x
+
+                if(rgb_y < rgb_min_y):
+                    rgb_min_y = rgb_y
+
+                if(rgb_x > rgb_max_x):
+                    rgb_max_x = rgb_x
+
+                if(rgb_y > rgb_max_y):
+                    rgb_max_y = rgb_y
+
 
                 x_local += pt_s.point.x
                 y_local += pt_s.point.y
@@ -256,7 +267,6 @@ class SegmentedScene:
 
                 if(pt_s.point.z > local_max_z):
                     local_max_z = pt_s.point.z
-
 
                 if(pt_s.point.x < local_min_x):
                     local_min_x = pt_s.point.x
@@ -276,6 +286,7 @@ class SegmentedScene:
                 pt_s.point = geometry_msgs.msg.Point(*xyz)
 
                 color_data = points[3]
+                
                 raw.append((pt_s.point.x,pt_s.point.y,pt_s.point.z,color_data))
 
                 cur_cluster.data_world.append(pt_s)
@@ -298,7 +309,9 @@ class SegmentedScene:
                 if(pt_s.point.z > max_z):
                     max_z = pt_s.point.z
 
-            print("3d bbox: [" + str(min_x) + "," + str(min_y) + "," +str(min_z) + "," + str(max_x) + "," + str(max_y) + ","+str(max_z)+"]")
+            print("RGB bbox: [" + str(rgb_min_x) + "," + str(rgb_min_y) + "," +str(rgb_max_x) + "," + str(rgb_max_y) + "]")
+            print("3d bbox (map): [" + str(min_x) + "," + str(min_y) + "," +str(min_z) + "," + str(max_x) + "," + str(max_y) + ","+str(max_z)+"]")
+            print("3d bbox (local): [" + str(local_min_x) + "," + str(local_min_y) + "," +str(local_min_z) + "," + str(local_max_x) + "," + str(local_max_y) + ","+str(local_max_z)+"]")
 
             x /= len(cur_cluster.data)
             y /= len(cur_cluster.data)
@@ -307,6 +320,9 @@ class SegmentedScene:
             x_local /= len(cur_cluster.data)
             y_local /= len(cur_cluster.data)
             z_local /= len(cur_cluster.data)
+
+            print("3d centroid (local): [" + str(x_local) + "," + str(y_local) + "," + str(z_local))
+
 
             # centroid of the cluster
             ps_t = PointStamped()
@@ -332,15 +348,19 @@ class SegmentedScene:
             print("local centroid:" + str(cur_cluster.local_centroid))
 
             cur_cluster.img_centroid = self.calculate_2d_image_centroid(cur_cluster.local_centroid)
-            cur_cluster.img_bbox = self.calculate_2d_image_bbox([local_min_x,local_min_y,local_min_z],[local_max_x,local_max_y,local_max_z])
+            cur_cluster.img_bbox = [[rgb_min_x,rgb_min_y],[rgb_max_x,rgb_max_y]]
 
             bbmin = cur_cluster.img_bbox[0]
             bbmax = cur_cluster.img_bbox[1]
-            print("bbmin: " + str(bbmin))
-            print("bbnax: " + str(bbmax))
 
-            bbox_width = bbmax[0]-bbmin[0]
-            bbox_height = bbmax[1]-bbmin[1]
+            print("bbmin: " + str(bbmin))
+            print("bbmax: " + str(bbmax))
+
+            bbox_width = abs(bbmax[0]-bbmin[0])
+            bbox_height = abs(bbmax[1]-bbmin[1])
+
+            print("bbw: " + str(bbox_width))
+            print("bbh: " + str(bbox_height))
 
 
             # this next bit isn't very nice, but it crops out the cluster from the image
@@ -350,29 +370,37 @@ class SegmentedScene:
             bx = cur_cluster.img_centroid[0]
             by = cur_cluster.img_centroid[1]
 
-            b_w = 64
-            b_h = b_w
-            if(bbox_width > b_w):
-                b_w = bbox_width
+            #b_w = 64
+            #b_h = b_w
+            #if(bbox_width > b_w):
+            #    b_w = bbox_width
 
-            if(bbox_height > b_h):
-                b_h = bbox_height
+            #if(bbox_width > b_h):
+            #    b_h = bbox_width
 
-            bx -= b_w/2
-            by -= b_h/2
+            padding = 24
 
-            y_targ = by+b_h
-            x_targ = bx+b_w
+            y_start = rgb_min_y-padding
+            y_end = rgb_max_y+padding
 
-            if(y_targ > 480):
-                y_targ = 480
+            x_start = rgb_min_x-padding
+            x_end = rgb_max_x+padding
 
-            if(x_targ > 640):
-                x_targ = 640
+            if(y_end > 480):
+                y_end = 480
 
-            #cv_image_cropped = cv_image[by:y_targ, bx:x_targ]
+            if(x_end > 640):
+                x_end = 640
 
-            #cur_cluster.cropped_image = bridge.cv2_to_imgmsg(cv_image_cropped, encoding="bgr8")
+            if(y_start < 0):
+                y_start = 0
+
+            if(x_start < 0):
+                x_start = 0
+
+            cur_cluster.cv_image_cropped = cv_image[y_start:y_end, x_start:x_end]
+
+            cur_cluster.cropped_image = bridge.cv2_to_imgmsg(cur_cluster.cv_image_cropped, encoding="bgr8")
 
             #success = cv2.imwrite(cid+'.jpeg',cv_image_cropped)
 
@@ -384,7 +412,19 @@ class SegmentedScene:
 
             bbox = BBox(min_x,max_x,min_y,max_y,min_z,max_z)
 
+            x_range = max_x-min_x
+            y_range = max_y-min_y
+            z_range = max_z-min_z
+            scale = 0.3
+
+            x_mod = x_range*scale
+            y_mod = y_range*scale
+            z_mod = z_range*scale
+
+            outer_core_bbox = BBox(min_x+x_mod,max_x-x_mod,min_y+y_mod,max_y-y_mod,min_z+z_mod,max_z-z_mod)
+
             cur_cluster.bbox = bbox
+            cur_cluster.outer_core_bbox = outer_core_bbox
 
             if(talk): print("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
 
@@ -426,17 +466,17 @@ class SOMAClusterTracker:
 
             new_scene = SegmentedScene(out,data,self.segmentation.listener)
 
-            if(talk): print("new scene added, with " + str(new_scene.num_clusters) + " clusters")
+            print("new scene added, with " + str(new_scene.num_clusters) + " clusters")
 
             self.prev_scene = self.cur_scene
             self.cur_scene = new_scene
 
             if(self.prev_scene):
-                if(talk): print("we have a previous observation to compare to")
+                print("we have a previous observation to compare to")
                 tracker = VotingBasedClusterTrackingStrategy()
                 tracker.track(self.cur_scene,self.prev_scene)
             else:
-                if(talk): print("no previous scene to compare to, skipping merging step")
+                print("no previous scene to compare to, skipping merging step, all clusters regarded as new")
 
         except rospy.ServiceException, e:
             if(talk): print("Failed Segmentation: ")
