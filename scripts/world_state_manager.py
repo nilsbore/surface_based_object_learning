@@ -151,7 +151,7 @@ class WorldStateManager:
         DEFAULT_TOPICS = [("/vision_logging_service/log", LoggingUBD),
                           ("/people_trajectory/trajectories/batch", Trajectories),
                           ("/robot_pose", geometry_msgs.msg.Pose),
-                          ("/bayes_people_tracker/PeopleTracker", PeopleTracker)]
+                          ("/people_tracker/positions", PeopleTracker)]
 
 
 
@@ -159,9 +159,15 @@ class WorldStateManager:
         cur_person.add_observation(person_observation)
 
 
-        people_tracker_output = person_observation.get_message("/bayes_people_tracker/PeopleTracker")
+        people_tracker_output = person_observation.get_message("/people_tracker/positions")
         # get the idx of the thing we want
-        person_idx = people_tracker_output.uuids.index(pid)
+        person_idx = ''
+        try:
+            person_idx = people_tracker_output.uuids.index(pid)
+        except:
+            rospy.logwarn(
+                "Can not capture %s information, the person has gone" % pid
+            )
 
         soma_objs=self.get_soma_objects_with_id(cur_person.key)
         cur_soma_person = None
@@ -184,13 +190,14 @@ class WorldStateManager:
             # either way we want to record this, so just do it here?
             #cur_soma_person.cloud = cur_scene_cluster.raw_segmented_pc
 
-            cur_soma_person.pose = people_tracker_output.poses[person_idx]
+            if person_idx != '':
+                cur_soma_person.pose = people_tracker_output.poses[person_idx]
 
             msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
             cur_soma_person.sweepCenter = msg
 
             print("inserting person detection into SOMA")
-            res = self.soma_insert([cur_soma_obj])
+            res = self.soma_insert([cur_soma_person])
 
         # update this object in some way
         # TODO: HOW?
