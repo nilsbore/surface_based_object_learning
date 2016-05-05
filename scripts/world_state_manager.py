@@ -97,6 +97,7 @@ class WorldStateManager:
             print("-- world_modeling node is missing one or more key services, cannot act --")
         else:
             pid = req.id
+            self.cur_waypoint = req.waypoint
             self.assign_people(pid)
             return PersonUpdateResponse(True)
 
