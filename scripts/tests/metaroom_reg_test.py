@@ -11,7 +11,7 @@ from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion
 import sensor_msgs.point_cloud2 as pc2
-import python_pcd
+#import python_pcd
 import tf
 # reg stuff #
 from observation_registration_services.srv import *
@@ -19,52 +19,6 @@ from observation_registration_services.srv import *
 if __name__ == '__main__':
     rospy.init_node('test_soma2', anonymous = False)
     print("off we go!")
-
-    print("getting soma service")
-    rospy.wait_for_service('soma2/query_db')
-    print("done")
-    print("setting up proxy")
-    soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
-    print("done")
-    print("making query")
-
-    query = SOMA2QueryObjsRequest()
-    query.query_type = 0
-    query.usetimestep = False
-    query.uselowertime =  False
-    query.useuppertime =  False
-    query.usedates =  False
-    query.useweekday =  False
-    query.useroi =  False
-
-    query.objectids = (["62e1baff-750a-4108-8ee4-d82c133f3191"])
-    query.objecttypes=['']
-
-    response = soma_query(query)
-
-    if not response.objects:
-        print("empty!")
-    else:
-        print("got the object")
-
-    world_model = World(server_host='localhost',server_port=62345)
-
-    obj = world_model.get_object("2034ec47-6ec5-4366-954f-f85f3d0ae0c7")
-    print("done")
-
-    observations = obj._observations
-
-    clouds = []
-    tf_ = []
-    time = []
-    for o in observations:
-        clouds.append(o.get_message('object_cloud'))
-        tf_.append(o.get_message('/tf'))
-        time.append(o.stamp)
-
-    print("got: " + str(len(clouds)) + " clouds for object")
-
-    print("getting metaroom reg service")
 
     reg_serv = rospy.ServiceProxy('additional_view_registration_server',AdditionalViewRegistrationService)
     print("got it")
@@ -85,7 +39,7 @@ if __name__ == '__main__':
 
     t_cld = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
 
-    response = reg_serv(additional_views=[t_cld])
+    response = reg_serv(additional_views=[t_cld,t_cld_2])
 
     print(response)
 

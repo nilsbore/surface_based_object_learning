@@ -28,7 +28,8 @@ from recognition_srv_definitions.srv import *
 
 # people tracker stuff #
 from bayes_people_tracker.msg import PeopleTracker
-from upper_body_detector.msg import UpperBodyDetector
+from vision_people_logging.msg import LoggingUBD
+from human_trajectory.msg import Trajectories
 
 import cv2
 talk = True
@@ -131,7 +132,11 @@ class WorldStateManager:
         # do we have a low-level object with this key?
             # if so get it out
             # if not, create it
-        cur_person = self.world_model.get_object(pid)
+        exists = self.world_model.does_object_exist(pid)
+        cur_person = None
+
+        if(exists):
+            cur_person = self.world_model.get_object(pid)
 
         if(not cur_person):
             print("creating person entry")
@@ -142,11 +147,9 @@ class WorldStateManager:
 
 
         # record this observation
-        DEFAULT_TOPICS = [("/head_xtion/rgb/image_rect_color", Image),
-                          ("/head_xtion/depth/image_rect", Image),
+        DEFAULT_TOPICS = [("/vision_logging_service/log", LoggingUBD),
+                          ("/people_trajectory/trajectories/batch", Trajectories),
                           ("/robot_pose", geometry_msgs.msg.Pose),
-                          ("/upper_body_detector/detections", UpperBodyDetector),
-                          ("/upper_body_detector/bounding_box_centres", geometry_msgs.msg.PoseArray),
                           ("/bayes_people_tracker/PeopleTracker", PeopleTracker)]
 
 
@@ -306,7 +309,6 @@ class WorldStateManager:
                 if(talk): print("making observation")
                 # add an observation for the object
 
-                # TODO: UNHACK THIS TO INCLUDE ROBOT POSE, DOESN'T WORK IN SIM
                 DEFAULT_TOPICS = [("/head_xtion/rgb/image_rect_color", Image),
                                   #("/head_xtion/rgb/camera_info", CameraInfo),
                                   #("/head_xtion/depth/points", PointCloud2),
