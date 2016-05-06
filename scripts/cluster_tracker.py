@@ -511,7 +511,7 @@ class SOMAClusterTracker:
 
     def add_unsegmented_scene(self,data):
         # takes in a SegmentedScene
-
+        print("\n\n--- Beginning Interpretation of Scene --")
         # segment the pc
         if(talk): print("waiting for segmentation service")
         print("segmenting (may take a second)")
@@ -520,20 +520,10 @@ class SOMAClusterTracker:
 
         try:
             out = self.segmentation.seg_service(cloud=data)
-        #    print("zzz")
-        #    print("waiting for img")
-        #    cur_img = rospy.wait_for_message("/pcl_segmentation_service/segmented_cloud_colored_img",Image)
-        #    print("waiting for cld")
-        #    cur_cld = rospy.wait_for_message("/pcl_segmentation_service/segmented_cloud_colored",sensor_msgs.msg.PointCloud2)
-        #    print("done")
-
-            #print("zzz")
 
             new_scene = SegmentedScene(out,data)
 
             print("new scene added, with " + str(new_scene.num_clusters) + " clusters")
-
-            self.prev_scene = self.cur_scene
             self.cur_scene = new_scene
 
             if(self.prev_scene):
@@ -547,7 +537,8 @@ class SOMAClusterTracker:
         except rospy.ServiceException, e:
             if(talk): print("Failed Segmentation: ")
             if(talk): print(e)
-
+            
+        self.prev_scene = self.cur_scene
         return new_scene
 
     def add_segmented_scene(self,new_scene):

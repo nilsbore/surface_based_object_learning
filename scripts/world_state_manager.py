@@ -127,7 +127,7 @@ class WorldStateManager:
                     # uh well, this is weird? can't acces the object directly from this query
                     # but can if I request it through the model
                     # TODO: fix this insanity
-                    wo = self.world_model.get_object("96c3c2c7-acc7-4acf-9aa9-5fa2be17b04a")
+                    wo = self.world_model.get_object(d.key)
                     print("cut object: " + d.key)
                     wo.cut()
         except Exception,e:
@@ -362,10 +362,11 @@ class WorldStateManager:
                     if(self.cluster_is_live(cur_scene_cluster.cluster_id,cur_scene.waypoint)):
                         #   fetch the world_model for the cluster
                         if(talk): print("got existing object")
+                        print("getting EXISTING cluster with id: " + cur_scene_cluster.cluster_id)
                         cur_cluster = self.world_model.get_object(cur_scene_cluster.cluster_id)
 
             if not cur_cluster:
-                if(talk): print("creating object: " + str(cur_scene.cluster.cluster_id))
+                if(talk): print("creating NEW cluster with id: " + str(cur_scene_cluster.cluster_id))
                 cur_cluster = self.world_model.create_object(cur_scene_cluster.cluster_id)
                 cur_cluster._parent = cur_scene.waypoint
                 self.cur_sequence_obj_ids.append(cur_scene_cluster.cluster_id)
