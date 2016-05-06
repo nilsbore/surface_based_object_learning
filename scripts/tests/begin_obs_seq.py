@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     # callback chain to deal with storing *objects*
     print("waiting for service")
-    rospy.wait_for_service('update_world_model')
+#    rospy.wait_for_service('update_world_model')
     print("got it")
 
     print("waiting for pointcloud message")
@@ -24,13 +24,17 @@ if __name__ == '__main__':
 
     print("making proxy")
     #world_update = rospy.ServiceProxy('update_world_model',WorldUpdate)
-    begin_obs = rospy.ServiceProxy('/begin_observations',Trigger)
-    #end_obs = rospy.ServiceProxy('/end_observations',Trigger)
-    print("done")
+    try:
+        begin_obs = rospy.ServiceProxy('/begin_observations',Trigger)
+        b = begin_obs()
+        print("done")
 
-    print("begin obs:")
-    b = begin_obs()
-    print(b)
+        print("begin obs:")
+        print(b)
+    except rospy.ServiceException, e:
+        print("ouch")
+    #end_obs = rospy.ServiceProxy('/end_observations',Trigger)
+
     #print("end obs")
     #e = end_obs()
     #print(e)

@@ -102,9 +102,9 @@ class BBox():
 
 
 class SegmentedCluster:
-    def __init__(self,idc,cloud):
+    def __init__(self,idc,cluster_indices):
         self.data = []
-        self.cloud = cloud
+        self.cluster_indices = cluster_indices
         self.data_world = []
         self.cluster_id = idc
         self.map_centroid = None
@@ -144,27 +144,37 @@ class SegmentedScene:
         return [x,y,z]
 
 
-    def calculate_2d_image_centroid(self,centroid):
-        model = image_geometry.PinholeCameraModel()
-        print("waiting for camera")
-        camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=3.0)
-        model.fromCameraInfo(camera_msg)
-        px = model.project3dToPixel((centroid[0], centroid[1], centroid[2]))
-        return px
+    #def calculate_2d_image_centroid(self,centroid):
+    #    model = image_geometry.PinholeCameraModel()
+    #    print("waiting for camera")
+    #    camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=3.0)
+    #    model.fromCameraInfo(camera_msg)
+    #    px = model.project3dToPixel((centroid[0], centroid[1], centroid[2]))
+    #    return px
+
+    def calculate_2d_image_centroid(self,bbox_min,bbox_max):
+        min_x = bbox_min[0]
+        max_x = bbox_max[0]
+        min_y = bbox_min[1]
+        max_y = bbox_max[1]
+
+        width = abs(max_x-min_x)
+        height = abs(max_y-min_y)
+
+        return [width/2,height/2]
 
 
-
-    def __init__(self,indices,cloud,listener):
+    def __init__(self,indices,input_scene_cloud,listener):
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
-        self.cloud = cloud
+        self.input_scene_cloud = input_scene_cloud
 
         print("transforming point cloud")
         translation,rotation = listener.lookupTransform("/map", "/head_xtion_rgb_optical_frame", rospy.Time())
 
         print("got it")
 
-        self.raw_cloud = pc2.read_points(cloud)
+        self.raw_cloud = pc2.read_points(input_scene_cloud)
         int_data = list(self.raw_cloud)
 
         self.cluster_list = []
@@ -214,7 +224,8 @@ class SegmentedScene:
             #if(talk): print("got transform: ")
             #if(talk): print(trans_cache[0])
 
-            raw = []
+            cluster_mapframe = []
+            cluster_raw = []
 
             model = image_geometry.PinholeCameraModel()
             print("waiting for camera")
@@ -234,6 +245,9 @@ class SegmentedScene:
                 pt_s.point.x = points[0]
                 pt_s.point.y = points[1]
                 pt_s.point.z = points[2]
+                color_data = points[3]
+
+                cluster_raw.append((pt_s.point.x,pt_s.point.y,pt_s.point.z,color_data))
 
                 # get the rgb pos of the point
                 rgb_point = model.project3dToPixel((pt_s.point.x, pt_s.point.y, pt_s.point.z))
@@ -285,9 +299,9 @@ class SegmentedScene:
                 # transform to map co-ordinates
                 pt_s.point = geometry_msgs.msg.Point(*xyz)
 
-                color_data = points[3]
-                
-                raw.append((pt_s.point.x,pt_s.point.y,pt_s.point.z,color_data))
+
+
+                cluster_mapframe.append((pt_s.point.x,pt_s.point.y,pt_s.point.z,color_data))
 
                 cur_cluster.data_world.append(pt_s)
 
@@ -334,21 +348,26 @@ class SegmentedScene:
             cur_cluster.map_centroid = np.array((ps_t.point.x ,ps_t.point.y, ps_t.point.z))
             cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
 
-            header = std_msgs.msg.Header()
-            header.stamp = rospy.Time.now()
-            header.frame_id = 'map'
-            cur_cluster.raw_segmented_pc = pc2.create_cloud(header, cloud.fields, raw)
+            header_map = std_msgs.msg.Header()
+            header_map.stamp = rospy.Time.now()
+            header_map.frame_id = 'map'
+            cur_cluster.segmented_pc_mapframe = pc2.create_cloud(header_map, input_scene_cloud.fields, cluster_mapframe)
 
-            #print("CLOUD HEADER:")
-            #print(cloud.header)
+            header_cam = std_msgs.msg.Header()
+            header_cam.stamp = rospy.Time.now()
+            header_cam.frame_id = 'head_xtion_rgb_optical_frame'
+            cur_cluster.segmented_pc_camframe = pc2.create_cloud(header_cam, input_scene_cloud.fields, cluster_mapframe)
+
 
             print("centroid:")
             # TODO: MAP CENTROID DOESN'T WORK ANY MORE
             print("map centroid:" + str(cur_cluster.map_centroid))
             print("local centroid:" + str(cur_cluster.local_centroid))
 
-            cur_cluster.img_centroid = self.calculate_2d_image_centroid(cur_cluster.local_centroid)
+
             cur_cluster.img_bbox = [[rgb_min_x,rgb_min_y],[rgb_max_x,rgb_max_y]]
+            cur_cluster.img_centroid = self.calculate_2d_image_centroid(cur_cluster.img_bbox[0],cur_cluster.img_bbox[1])
+
 
             bbmin = cur_cluster.img_bbox[0]
             bbmax = cur_cluster.img_bbox[1]

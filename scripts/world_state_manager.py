@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 
+# general stuff
 import roslib
 import rospy
 import sys
 import argparse
 import os
 from random import randint
+import cv2
+
 # ROS stuff
 from sensor_msgs.msg import PointCloud2, PointField
 from cluster_tracker import SOMAClusterTracker
@@ -31,7 +34,10 @@ from bayes_people_tracker.msg import PeopleTracker
 from vision_people_logging.msg import LoggingUBD
 from human_trajectory.msg import Trajectories
 
-import cv2
+# registration stuff
+from observation_registration_services.srv import *
+
+
 talk = True
 
 class WorldStateManager:
@@ -44,6 +50,8 @@ class WorldStateManager:
         if(talk): print("world model done")
 
         self.cluster_tracker = SOMAClusterTracker()
+        self.pending_obs = []
+        self.cur_sequence_obj_ids = []
 
         # TODO: THIS NEEDS TO BE *REGISTERED* EVENTUALLY
         self.transform_store = TransformationStore()
@@ -64,7 +72,10 @@ class WorldStateManager:
         begin_observations = rospy.Service('/begin_observations',Trigger,self.begin_obs)
         end_observations = rospy.Service('/end_observations',Trigger,self.end_obs)
 
-
+        print("setting up view registration service provided by strands_3d_mapping")
+        rospy.wait_for_service('additional_view_registration_server')
+        self.view_registration_server = rospy.ServiceProxy('additional_view_registration_server',AdditionalViewRegistrationService)
+        print("done")
 
         print("setting up SOMA services")
         print("getting insert service")
@@ -103,27 +114,33 @@ class WorldStateManager:
 
     def clean_up_obs(self):
         print("running cleanup")
+        self.pending_obs = []
         try:
+            # TODO: have to hack this due to issue with world_model code I'd rather not touch for now
             query = {'_life_end': None}
             db = self.world_model._mongo.database['Objects'].find(query)
             if(db):
                 for d in db:
-                    print("cut object")
-                    d.cut()
+                    # uh well, this is weird? can't acces the object directly from this query
+                    # but can if I request it through the model
+                    # TODO: fix this insanity
+                    print("cut object: " + d.key)
+                    obj = self.world_model.get_object(d.key)
+                    obj.cut()
         except Exception,e:
             print("Failed to clean up obs due to DB error")
             print(e)
 
 
     def begin_obs(self,req):
-        print("beginning observations")
+        print("-- received signal to begin sequence of observations --")
         self.clean_up_obs()
         return TriggerResponse(True,"Observations Beginning: Assuming all subsequent observations are from the same sequence.")
 
 
     def end_obs(self,req):
-        print("ending observations")
-        self.clean_up_obs()
+        print("-- received signal to terminate sequence of observations --")
+        self.object_segment_batch_run()
         return TriggerResponse(True,"Observations Ending: Assuming all previous observations were from the same sequence.")
 
 
@@ -188,7 +205,7 @@ class WorldStateManager:
             cur_soma_person.waypoint = self.cur_waypoint
 
             # either way we want to record this, so just do it here?
-            #cur_soma_person.cloud = cur_scene_cluster.raw_segmented_pc
+            #cur_soma_person.cloud = cur_scene_cluster.segmented_pc_mapframe
 
             if person_idx != '':
                 cur_soma_person.pose = people_tracker_output.poses[person_idx]
@@ -204,25 +221,63 @@ class WorldStateManager:
 
 
     def object_segment_callback(self, req):
-
         if(self.setup_clean is False):
             print("-- world_modeling node is missing one or more key services, cannot act --")
+            print("-- run services and then re-start me --")
+            return WorldUpdateResponse(False)
         else:
-            data = req.input
+            # store point cloud for later use
+            self.pending_obs.append(req)
+            print("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
+            return WorldUpdateResponse(True)
+
+
+    def object_segment_batch_run(self):
+        for req in self.pending_obs:
+            print("processing cloud")
+            cloud_data = req.input
             self.cur_waypoint = req.waypoint
 
-            print("got data")
-            # handles service calls containing point clouds
-            self.cur_waypoint = req.waypoint
-
-            if(talk): print("got cloud:" + str(data.header.seq))
+            if(talk): print("got cloud:" + str(cloud_data.header.seq))
             try:
-                self.cluster_tracker.add_unsegmented_scene(data)
+                self.cluster_tracker.add_unsegmented_scene(cloud_data)
                 self.assign_clusters()
-                return WorldUpdateResponse(True)
             except rospy.ServiceException, e:
                 if(talk): print "service call failed: %s"%e
-                return WorldUpdateResponse(False)
+
+    def register_object_views(self):
+        print("-- beginning post-processing")
+        for object_id in self.cur_scene_obj_ids:
+            soma_object = self.get_soma_objects_with_id(object_id)
+            print("attempting to process object: " + str(object_id))
+            # should be impossible, but just in case
+            if(not soma_object):
+                print("SOMA object doesn't exist")
+                pass
+
+            if(not self.world_model.does_object_exist(object_id)):
+                print("WORLD object doesn't exist")
+                pass
+
+            try:
+                world_object = self.world_model.get_object(object_id)
+            except rospy.ServiceException, e:
+                print("DB ERROR")
+
+            observations = world_object._observations
+            obj_scene_views = []
+            obj_cluster_views = []
+            obj_cluster_views = []
+
+            for obs in observations:
+                obj_scene_views.append(obs.get_message("/head_xtion/depth_registered/points"))
+                obj_scene_views.append(obs.get_message("object_cloud_camframe"))
+
+            print("got: " + str(len(obj_scene_views)) + " observations")
+
+            print("attempting to register views with one-another")
+            #response = self.view_registration_server(additional_views=obj_scene_views)
+
 
 
 
@@ -284,10 +339,10 @@ class WorldStateManager:
 
         # if this is not scene 0, ie. we have a previous scene to compare to
         if not prev_scene:
-            print("don't have prev")
+            print("don't have previous scene to compare to, assuming first run")
 
         if not cur_scene:
-            print("don't have current scene")
+            print("don't have anything in the current scene...")
             print("did segmentation fail?")
             return
 
@@ -309,6 +364,7 @@ class WorldStateManager:
                 if(talk): print("creating object")
                 cur_cluster = self.world_model.create_object(cur_scene_cluster.cluster_id)
                 cur_cluster._parent = self.cur_waypoint
+                self.cur_sequence_obj_ids.append(cur_scene_cluster.cluster_id)
 
             # from here we've either added this as a new object to the scene
             # or retreived the data for it in a previous scene
@@ -341,10 +397,15 @@ class WorldStateManager:
                 #if(talk): print(pose.position)
                 cur_cluster.add_pose(ws_pose)
 
-            #    print(cur_cluster.identifications)
+                # store a bunch of image stuff about the cluster
+                cloud_observation.add_message(cur_scene_cluster.segmented_pc_mapframe,"object_cloud_mapframe")
+                cloud_observation.add_message(cur_scene_cluster.segmented_pc_camframe,"object_cloud_camframe")
 
-                # store the segmented point cloud for this cluster
-                cloud_observation.add_message(cur_scene_cluster.raw_segmented_pc,"object_cloud")
+
+                #cloud_observation.add_message(cur_scene_cluster.img_bbox,"image_bounding_box")
+                #cloud_observation.add_message(cur_scene_cluster.img_centroid,"image_centroid")
+                cloud_observation.add_message(cur_scene_cluster.cropped_image,"image_cropped")
+
 
                 # store the cropped rgb image for this cluster
             #    print("result: ")
@@ -352,7 +413,7 @@ class WorldStateManager:
                 try:
                     self.recognition_service = rospy.wait_for_service('/recognition_service/sv_recognition',1)
                     print("recognition online")
-                    recog_out = self.seg_service(cur_scene_cluster.raw_segmented_pc)
+                    recog_out = self.seg_service(cur_scene_cluster.segmented_pc_mapframe)
 
                     # this should give us back #
                     labels = recog_out.ids
@@ -367,17 +428,17 @@ class WorldStateManager:
                 cur_soma_obj = None
 
                 soma_objs = self.get_soma_objects_with_id(cur_cluster.key)
+                ## -- writes nice cropped images to files --- #
+                #cid = cur_scene_cluster.cluster_id
+                #fid = str(randint(0,9000000))
+                #if not os.path.exists(cid):
+                #    os.makedirs(cid)
+                #success = cv2.imwrite(cid+"/"+fid+'.jpeg',cur_scene_cluster.cv_image_cropped)
+                #print("SUCCESS WITH TEST WRITE: ")
+                #print(success)
 
-                cid = cur_scene_cluster.cluster_id
-                fid = str(randint(0,9000000))
 
-                if not os.path.exists(cid):
-                    os.makedirs(cid)
 
-                success = cv2.imwrite(cid+"/"+fid+'.jpeg',cur_scene_cluster.cv_image_cropped)
-
-                print("SUCCESS WITH TEST WRITE: ")
-                print(success)
 
                 if(soma_objs.objects):
                     print("soma has this object")
@@ -396,7 +457,7 @@ class WorldStateManager:
                         cur_soma_obj.waypoint = self.cur_waypoint
 
                         # either way we want to record this, so just do it here?
-                        cur_soma_obj.cloud = cur_scene_cluster.raw_segmented_pc
+                        cur_soma_obj.cloud = cur_scene_cluster.segmented_pc_mapframe
 
                         soma_pose = geometry_msgs.msg.Pose()
                         soma_pose.position.x = cur_scene_cluster.local_centroid[0]
