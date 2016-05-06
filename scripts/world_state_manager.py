@@ -118,6 +118,8 @@ class WorldStateManager:
     def clean_up_obs(self):
         print("running cleanup")
         self.pending_obs = []
+        self.cluster_tracker.reset()
+        
         try:
             # TODO: have to hack this due to issue with world_model code I'd rather not touch for now
             query = {'_life_end': None}
@@ -357,6 +359,9 @@ class WorldStateManager:
             cur_cluster = None
 
             if(prev_scene):
+                print("seeing if prev scene contains: " + str(cur_scene_cluster.cluster_id))
+                for pc in prev_scene.cluster_list:
+                    print(pc.cluster_id)
                 if(prev_scene.contains_cluster_id(cur_scene_cluster.cluster_id)):
                     # do we have a living world model for this cluster already?
                     if(self.cluster_is_live(cur_scene_cluster.cluster_id,cur_scene.waypoint)):

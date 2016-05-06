@@ -509,6 +509,10 @@ class SOMAClusterTracker:
         self.prev_scene = None
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
 
+    def reset(self):
+        self.cur_scene = None
+        self.prev_scene = None
+
     def add_unsegmented_scene(self,data):
         # takes in a SegmentedScene
         print("\n\n--- Beginning Interpretation of Scene --")
@@ -537,7 +541,7 @@ class SOMAClusterTracker:
         except rospy.ServiceException, e:
             if(talk): print("Failed Segmentation: ")
             if(talk): print(e)
-            
+
         self.prev_scene = self.cur_scene
         return new_scene
 
