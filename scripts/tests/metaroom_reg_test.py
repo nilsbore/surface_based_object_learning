@@ -11,7 +11,7 @@ from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion
 import sensor_msgs.point_cloud2 as pc2
-#import python_pcd
+import python_pcd
 import tf
 # reg stuff #
 from observation_registration_services.srv import *
@@ -20,26 +20,85 @@ if __name__ == '__main__':
     rospy.init_node('test_soma2', anonymous = False)
     print("off we go!")
 
+    print("getting soma service")
+    rospy.wait_for_service('soma2/query_db')
+    print("done")
+    print("setting up proxy")
+    soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
+    print("done")
+    print("making query")
+
+    query = SOMA2QueryObjsRequest()
+    query.query_type = 0
+    query.usetimestep = False
+    query.uselowertime =  False
+    query.useuppertime =  False
+    query.usedates =  False
+    query.useweekday =  False
+    query.useroi =  False
+
+    query.objectids = (["62e1baff-750a-4108-8ee4-d82c133f3191"])
+    query.objecttypes=['']
+
+    response = soma_query(query)
+
+    if not response.objects:
+        print("empty!")
+    else:
+        print("got the object")
+
+    world_model = World(server_host='localhost',server_port=62345)
+
+    obj = world_model.get_object("2034ec47-6ec5-4366-954f-f85f3d0ae0c7")
+    print("done")
+
+    observations = obj._observations
+
+    clouds = []
+    tf_ = []
+    time = []
+    for o in observations:
+        clouds.append(o.get_message('object_cloud'))
+        tf_.append(o.get_message('/tf'))
+        time.append(o.stamp)
+
+    print("got: " + str(len(clouds)) + " clouds for object")
+
+    print("getting metaroom reg service")
+
     reg_serv = rospy.ServiceProxy('additional_view_registration_server',AdditionalViewRegistrationService)
     print("got it")
 
-    #tr = TransformationStore.msg_to_transformer(tf[0])
 
-    #tr_r = tr.lookupTransform("head_xtion_depth_optical_frame","odom",rospy.Time.from_sec(1461972565.708218098))
-    listener = tf.TransformListener()
-    listener.waitForTransform("/base_link", "/head_xtion_rgb_optical_frame", rospy.Time(), rospy.Duration(4.0))
+    views = 0
+    input_clouds = []
+    input_transforms = []
 
-    tr_r = listener.lookupTransform("base_link", "head_xtion_rgb_optical_frame", rospy.Time())
+    while(views < 7):
+        invar = raw_input('press key to take view')
+        listener = tf.TransformListener()
+        listener.waitForTransform("map", "head_xtion_rgb_optical_frame", rospy.Time(), rospy.Duration(4.0))
 
-    transform = Transform()
-    transform.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
-    transform.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
+        tr_r = listener.lookupTransform("map", "head_xtion_rgb_optical_frame", rospy.Time())
 
-    print(transform)
+        transform = Transform()
+        transform.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
+        transform.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
 
-    t_cld = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    #    print(transform)
 
-    response = reg_serv(additional_views=[t_cld,t_cld_2])
+        t_cld = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+
+        input_clouds.append(t_cld)
+        input_transforms.append(transform)
+        print("done")
+        views+=1
+
+
+    print("running service call")
+    obs_xml = "/home/jxy/.semanticMap/20160505/patrol_run_1/room_5/room.xml"
+    response = reg_serv(observation_xml=obs_xml,additional_views=input_clouds,additional_views_odometry_transforms=input_transforms)
+    #response = reg_serv(observation_xml=obs_xml,additional_views=[t_cld])
 
     print(response)
 
