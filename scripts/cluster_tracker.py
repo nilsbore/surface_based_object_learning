@@ -12,7 +12,7 @@ import ctypes
 import struct
 from segmentation_srv_definitions.srv import *
 import numpy as np
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import PointStamped, Pose, Transform, TransformStamped, Vector3, Quaternion
 import tf
 import PyKDL
 import tf2_ros
@@ -164,22 +164,67 @@ class SegmentedScene:
         return [width/2,height/2]
 
 
-    def __init__(self,indices,input_scene_cloud,listener):
+    def transform_to_kdl(self,t):
+         return PyKDL.Frame(PyKDL.Rotation.Quaternion(t.transform.rotation.x, t.transform.rotation.y,
+                                                      t.transform.rotation.z, t.transform.rotation.w),
+                            PyKDL.Vector(t.transform.translation.x,
+                                         t.transform.translation.y,
+                                         t.transform.translation.z))
+
+    def transform_cloud_to_map(self,cloud):
+        tr_r = self.listener.lookupTransform("map", "head_xtion_depth_optical_frame", rospy.Time())
+        tr = Transform()
+        tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
+        tr.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
+
+        tr_s = TransformStamped()
+        tr_s.header = std_msgs.msg.Header()
+        tr_s.header.stamp = rospy.Time.now()
+        tr_s.header.frame_id = 'map'
+        tr_s.child_frame_id = "head_xtion_depth_optical_frame"
+        tr_s.transform = tr
+
+        t_kdl = self.transform_to_kdl(tr_s)
+        points_out = []
+        for p_in in pc2.read_points(cloud):
+            p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
+            points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
+
+        res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
+        return res
+
+
+
+    def __init__(self,indices,input_scene_cloud):
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.input_scene_cloud = input_scene_cloud
 
+        self.listener = tf.TransformListener()
+        if(talk): print("waiting for tf")
+        self.listener.waitForTransform("map", "head_xtion_depth_optical_frame", rospy.Time(), rospy.Duration(4.0))
+        if(talk): print("gotcha")
+
+        self.waypoint = "None"
         print("transforming point cloud")
-        translation,rotation = listener.lookupTransform("/map", "/head_xtion_rgb_optical_frame", rospy.Time())
+        translation,rotation = self.listener.lookupTransform("map", "head_xtion_depth_optical_frame", rospy.Time())
+        print("trans: ")
+        print(translation)
+
+        print("rot: ")
+        print(rotation)
 
         print("got it")
+
+        print("trying kdtree approach")
+
+
 
         self.raw_cloud = pc2.read_points(input_scene_cloud)
         int_data = list(self.raw_cloud)
 
         self.cluster_list = []
 
-        #
         print("getting image of scene")
         scene_img = rospy.wait_for_message("/head_xtion/rgb/image_rect_color",  Image, timeout=15.0)
         bridge = CvBridge()
@@ -190,8 +235,6 @@ class SegmentedScene:
         for root_cluster in indices.clusters_indices:
             if(talk): print("--- CLUSTER ----")
 
-            #cid = [random.choice("ABCDEFGHIGJSDHS903R4IDFA34RAFDAFDLLAFD") for _ in range(4)] # this call makes me very nervous
-            #cid = ''.join(cid)
             cid = str(uuid.uuid4()) # str so we can later link it to a soma2 object, which indexes by string
             if(talk): print("randomly assigned temporary cid: " + str(cid))
             cur_cluster = SegmentedCluster(cid,root_cluster)
@@ -218,17 +261,18 @@ class SegmentedScene:
             local_min_x=local_min_y=local_min_z = 99999
             local_max_x=local_max_y=local_max_z = -99999
 
-            #translation,rotation = listener.lookupTransform("/map", "/head_xtion_rgb_optical_frame", rospy.Time())
             trans_matrix = np.dot(transformations.translation_matrix(translation), transformations.quaternion_matrix(rotation))
+            print("trans_matrix: ")
+            print(trans_matrix)
 
             #if(talk): print("got transform: ")
             #if(talk): print(trans_cache[0])
 
             cluster_mapframe = []
-            cluster_raw = []
+            cluster_camframe = []
 
             model = image_geometry.PinholeCameraModel()
-            print("waiting for camera")
+            print("waiting for /head_xtion/depth_registered/camera_info")
             camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=3.0)
             model.fromCameraInfo(camera_msg)
 
@@ -247,7 +291,7 @@ class SegmentedScene:
                 pt_s.point.z = points[2]
                 color_data = points[3]
 
-                cluster_raw.append((pt_s.point.x,pt_s.point.y,pt_s.point.z,color_data))
+                cluster_camframe.append((pt_s.point.x,pt_s.point.y,pt_s.point.z,color_data))
 
                 # get the rgb pos of the point
                 rgb_point = model.project3dToPixel((pt_s.point.x, pt_s.point.y, pt_s.point.z))
@@ -348,15 +392,17 @@ class SegmentedScene:
             cur_cluster.map_centroid = np.array((ps_t.point.x ,ps_t.point.y, ps_t.point.z))
             cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
 
-            header_map = std_msgs.msg.Header()
-            header_map.stamp = rospy.Time.now()
-            header_map.frame_id = 'map'
-            cur_cluster.segmented_pc_mapframe = pc2.create_cloud(header_map, input_scene_cloud.fields, cluster_mapframe)
 
             header_cam = std_msgs.msg.Header()
             header_cam.stamp = rospy.Time.now()
-            header_cam.frame_id = 'head_xtion_rgb_optical_frame'
-            cur_cluster.segmented_pc_camframe = pc2.create_cloud(header_cam, input_scene_cloud.fields, cluster_mapframe)
+            header_cam.frame_id = 'head_xtion_depth_optical_frame'
+            cur_cluster.segmented_pc_camframe = pc2.create_cloud(header_cam, input_scene_cloud.fields, cluster_camframe)
+
+            header_map = std_msgs.msg.Header()
+            header_map.stamp = rospy.Time.now()
+            header_map.frame_id = 'map'
+            #cur_cluster.segmented_pc_mapframe = pc2.create_cloud(header_map, input_scene_cloud.fields, cluster_mapframe)
+            cur_cluster.segmented_pc_mapframe = self.transform_cloud_to_map(cur_cluster.segmented_pc_camframe)
 
 
             print("centroid:")
@@ -483,7 +529,7 @@ class SOMAClusterTracker:
 
             #print("zzz")
 
-            new_scene = SegmentedScene(out,data,self.segmentation.listener)
+            new_scene = SegmentedScene(out,data)
 
             print("new scene added, with " + str(new_scene.num_clusters) + " clusters")
 
@@ -494,12 +540,15 @@ class SOMAClusterTracker:
                 print("we have a previous observation to compare to")
                 tracker = VotingBasedClusterTrackingStrategy()
                 tracker.track(self.cur_scene,self.prev_scene)
+                new_scene.prev_scene = self.prev_scene
             else:
+                new_scene.prev_scene = None
                 print("no previous scene to compare to, skipping merging step, all clusters regarded as new")
-
         except rospy.ServiceException, e:
             if(talk): print("Failed Segmentation: ")
             if(talk): print(e)
+
+        return new_scene
 
     def add_segmented_scene(self,new_scene):
         # takes in a SegmentedScene
@@ -522,11 +571,6 @@ class SegmentationWrapper:
         if(talk): print("loading wrapper")
 
         self.cluster_tracker = ct
-
-        self.listener = tf.TransformListener()
-        if(talk): print("waiting for tf")
-        self.listener.waitForTransform("/head_xtion_rgb_optical_frame", "/map", rospy.Time(), rospy.Duration(4.0))
-        if(talk): print("gotcha")
 
         #self.p_sub = rospy.Subscriber("/head_xtion/depth_registered/points", PointCloud2, self.cloud_callback)
 
@@ -564,7 +608,7 @@ class SegmentationWrapper:
         try:
             out = self.seg_service(cloud=data)
             if(talk): print("segmentation complete")
-            p = SegmentedScene(out,data,self.listener)
+            p = SegmentedScene(out,data)
             self.cluster_tracker.add_segmented_scene(p)
             #if(talk): print(out)
 

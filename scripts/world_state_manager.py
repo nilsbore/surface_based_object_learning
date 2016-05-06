@@ -41,6 +41,9 @@ from observation_registration_services.srv import *
 talk = True
 
 class WorldStateManager:
+
+
+
     def __init__(self,db_hostname,db_port):
         rospy.init_node('world_state_modeling', anonymous = False)
         self.setup_clean = False
@@ -118,15 +121,15 @@ class WorldStateManager:
         try:
             # TODO: have to hack this due to issue with world_model code I'd rather not touch for now
             query = {'_life_end': None}
-            db = self.world_model._mongo.database['Objects'].find(query)
+            db = self.world_model._mongo.database.Objects.find({"__pyobject_class_type": Object.get_pyoboject_class_string(),'_life_end': None,})
             if(db):
                 for d in db:
                     # uh well, this is weird? can't acces the object directly from this query
                     # but can if I request it through the model
                     # TODO: fix this insanity
+                    wo = self.world_model.get_object("96c3c2c7-acc7-4acf-9aa9-5fa2be17b04a")
                     print("cut object: " + d.key)
-                    obj = self.world_model.get_object(d.key)
-                    obj.cut()
+                    wo.cut()
         except Exception,e:
             print("Failed to clean up obs due to DB error")
             print(e)
@@ -227,27 +230,28 @@ class WorldStateManager:
             return WorldUpdateResponse(False)
         else:
             # store point cloud for later use
-            self.pending_obs.append(req)
+            scene = self.cluster_tracker.add_unsegmented_scene(req.input)
+            scene.waypoint = req.waypoint
+            self.pending_obs.append(scene)
             print("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
             return WorldUpdateResponse(True)
 
 
     def object_segment_batch_run(self):
-        for req in self.pending_obs:
+        for scene in self.pending_obs:
             print("processing cloud")
-            cloud_data = req.input
-            self.cur_waypoint = req.waypoint
-
-            if(talk): print("got cloud:" + str(cloud_data.header.seq))
+            #if(talk): print("got cloud:" + str(cloud_data.header.seq))
             try:
-                self.cluster_tracker.add_unsegmented_scene(cloud_data)
-                self.assign_clusters()
+                self.assign_clusters(scene)
             except rospy.ServiceException, e:
                 if(talk): print "service call failed: %s"%e
 
+        print("-- batch processing complete, attempting post-processing--")
+        #self.register_object_views()
+
     def register_object_views(self):
         print("-- beginning post-processing")
-        for object_id in self.cur_scene_obj_ids:
+        for object_id in self.cur_sequence_obj_ids:
             soma_object = self.get_soma_objects_with_id(object_id)
             print("attempting to process object: " + str(object_id))
             # should be impossible, but just in case
@@ -267,26 +271,27 @@ class WorldStateManager:
             observations = world_object._observations
             obj_scene_views = []
             obj_cluster_views = []
-            obj_cluster_views = []
 
             for obs in observations:
                 obj_scene_views.append(obs.get_message("/head_xtion/depth_registered/points"))
-                obj_scene_views.append(obs.get_message("object_cloud_camframe"))
+                obj_cluster_views.append(obs.get_message("object_cloud_camframe"))
 
             print("got: " + str(len(obj_scene_views)) + " observations")
 
             print("attempting to register views with one-another")
             #response = self.view_registration_server(additional_views=obj_scene_views)
 
+        print("post-processing complete")
 
 
 
-    def cluster_is_live(self,cluster_id):
-        if(talk): print("seeing if object exists:" + str(cluster_id) +" in: " + self.cur_waypoint)
+
+    def cluster_is_live(self,cluster_id,waypoint):
+        if(talk): print("seeing if object exists:" + str(cluster_id) +" in: " + waypoint)
         exists = self.world_model.does_object_exist(cluster_id)
 
         if(exists):
-            live_objects = map(lambda x: x.name, self.world_model.get_children(self.cur_waypoint, {'_life_end': None,}))
+            live_objects = map(lambda x: x.name, self.world_model.get_children(waypoint, {'_life_end': None,}))
             if(talk): print("live objects:" + str(live_objects))
             if(talk): print("cid: " + str(cluster_id))
             if(cluster_id in live_objects):
@@ -326,10 +331,10 @@ class WorldStateManager:
 
         return response
 
-    def assign_clusters(self):
+    def assign_clusters(self,scene):
         if(talk): print("assigning")
-        cur_scene = self.cluster_tracker.cur_scene
-        prev_scene = self.cluster_tracker.prev_scene
+        cur_scene = scene
+        prev_scene = scene.prev_scene
 
         if(talk): print("waiting for insert service")
 
@@ -354,16 +359,15 @@ class WorldStateManager:
             if(prev_scene):
                 if(prev_scene.contains_cluster_id(cur_scene_cluster.cluster_id)):
                     # do we have a living world model for this cluster already?
-                    if(self.cluster_is_live(cur_scene_cluster.cluster_id)):
+                    if(self.cluster_is_live(cur_scene_cluster.cluster_id,cur_scene.waypoint)):
                         #   fetch the world_model for the cluster
                         if(talk): print("got existing object")
                         cur_cluster = self.world_model.get_object(cur_scene_cluster.cluster_id)
 
-
             if not cur_cluster:
-                if(talk): print("creating object")
+                if(talk): print("creating object: " + str(cur_scene.cluster.cluster_id))
                 cur_cluster = self.world_model.create_object(cur_scene_cluster.cluster_id)
-                cur_cluster._parent = self.cur_waypoint
+                cur_cluster._parent = cur_scene.waypoint
                 self.cur_sequence_obj_ids.append(cur_scene_cluster.cluster_id)
 
             # from here we've either added this as a new object to the scene
@@ -454,7 +458,7 @@ class WorldStateManager:
                         cur_soma_obj = SOMA2Object()
                         cur_soma_obj.id = cur_cluster.key
                         cur_soma_obj.type = "unknown"
-                        cur_soma_obj.waypoint = self.cur_waypoint
+                        cur_soma_obj.waypoint = cur_scene.waypoint
 
                         # either way we want to record this, so just do it here?
                         cur_soma_obj.cloud = cur_scene_cluster.segmented_pc_mapframe
@@ -491,14 +495,18 @@ class WorldStateManager:
                     try:
                         prev_cluster = self.world_model.get_object(prev_scene_cluster.cluster_id)
                         prev_cluster.cut()
-                    except rospy.ServiceException, e:
-                        if(talk): print "failed to cut object, is the database server OK?"
+                    except Exception, e:
+                        print("failed to cut object, is the database server OK?")
+                        print("restart of node possibly required")
 
             else:
                 if(talk): print("object still live, not cutting")
 
         print("World Update Complete")
         print("")
+
+
+
 
 
 if __name__ == '__main__':

@@ -40,7 +40,7 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                         # increment the score if a point in the current cluster is in the bbox of the previous cluster
                         scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
                         if(prev_cluster.outer_core_bbox.contains_pointstamped(point.point)):
-                            print("point is in outer core!")
+                            #print("point is in outer core!")
                             scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
 
         print("raw scores")
