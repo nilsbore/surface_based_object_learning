@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+
+
 import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField

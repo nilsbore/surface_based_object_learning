@@ -12,11 +12,12 @@ import cv2
 # ROS stuff
 from sensor_msgs.msg import PointCloud2, PointField
 from cluster_tracker import SOMAClusterTracker
+from view_registration import ViewAlignmentManager
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo, JointState
 from std_srvs.srv import Trigger, TriggerResponse
 
 # WS stuff
-from soma_io.observation import Observation, TransformationStore
+from soma_io.observation import *
 from soma_io.geometry import *
 from soma_io.state import World, Object
 import soma_io.geometry as ws_geom
@@ -73,15 +74,20 @@ class WorldStateManager:
 
 
         print("setting up SOMA services")
-        print("getting insert service")
+        print("getting SOMA insert service")
         rospy.wait_for_service('soma2/insert_objects')
         print("done")
         self.soma_insert = rospy.ServiceProxy('soma2/insert_objects',SOMA2InsertObjs)
 
-        print("getting query service")
+        print("getting SOMA query service")
         rospy.wait_for_service('soma2/query_db')
         print("done")
         self.soma_get = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
+
+        print("getting SOMA update service")
+        rospy.wait_for_service('/soma2/update_object')
+        print("done")
+        self.soma_update = rospy.ServiceProxy('soma2/update_object',SOMA2UpdateObject)
 
         print("getting recognition service")
         self.recog_service = rospy.ServiceProxy('/recognition_service/sv_recognition',recognize)
@@ -237,12 +243,16 @@ class WorldStateManager:
     def do_view_alignment(self):
         print("-- beginning post-processing, attempting view alignment -- ")
         for object_id in self.cur_sequence_obj_ids:
-            soma_object = self.get_soma_objects_with_id(object_id)
+            soma_objects = self.get_soma_objects_with_id(object_id)
             print("attempting to process object: " + str(object_id))
+
             # should be impossible, but just in case
-            if(not soma_object):
+
+            if(not soma_objects.objects[0]):
                 print("SOMA object doesn't exist")
                 pass
+            else:
+                print("got this SOMA object")
 
             if(not self.world_model.does_object_exist(object_id)):
                 print("WORLD object doesn't exist")
@@ -257,18 +267,33 @@ class WorldStateManager:
             observations = world_object._observations
             print("observations for " + str(object_id) + " = " + str(len(observations)))
             if(len(observations) >= 2):
-                merged_cloud = self.view_alignment_manager.register_views(observations)
-                message_proxy = MessageStoreProxy(collection="ws_merged_aligned_clouds")
-                msg_id = message_proxy.insert(merged_cloud)
-                mso = MessageStoreObject(
-                    database=message_proxy.database,
-                    collection=message_proxy.collection,
-                    obj_id=msg_id,
-                    typ=merged_cloud._type)
-                world_object._point_cloud = mso
+                print("processing...")
+                # update world model
+                try:
+                    print("updating world model")
+                    merged_cloud = self.view_alignment_manager.register_views(observations)
+                    message_proxy = MessageStoreProxy(collection="ws_merged_aligned_clouds")
+                    msg_id = message_proxy.insert(merged_cloud)
+                    mso = MessageStoreObject(
+                        database=message_proxy.database,
+                        collection=message_proxy.collection,
+                        obj_id=msg_id,
+                        typ=merged_cloud._type)
+                    world_object._point_cloud = mso
 
+                    # update SOMA
+                    print("updating SOMA")
+                    soma_objects.objects[0].cloud = merged_cloud
+                    
+                    self.soma_update(soma_objects.objects[0],str(soma_objects.objects[0].id))
+                except Exception,e:
+                    print("problem updating object models in world/SOMA db. Unable to register merged clouds")
+                    print(e)
+                    pass
+            else:
+                print("ignoring")
 
-            #response = self.view_registration_server(additional_views=obj_scene_views)
+                print("successfully updated object")
 
         print("post-processing complete")
 
