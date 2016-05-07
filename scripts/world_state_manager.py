@@ -119,7 +119,7 @@ class WorldStateManager:
         print("running cleanup")
         self.pending_obs = []
         self.cluster_tracker.reset()
-        
+
         try:
             # TODO: have to hack this due to issue with world_model code I'd rather not touch for now
             query = {'_life_end': None}

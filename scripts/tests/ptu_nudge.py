@@ -26,7 +26,7 @@ def look_at_table():
     ptuClient.wait_for_server()
 
     goal = flir_pantilt_d46.msg.PtuGotoGoal()
-    goal.tilt = 7 # 30 seems best
+    goal.tilt = 15 # 30 seems best
     goal.tilt_vel = 0.1
     ptuClient.send_goal(goal)
     ptuClient.wait_for_result()
@@ -34,5 +34,5 @@ def look_at_table():
 if __name__ == '__main__':
     rospy.init_node('nudge_ptu', anonymous = True)
     reset_gaze()
-    look_at_table()
+#    look_at_table()
 #    rospy.spin()

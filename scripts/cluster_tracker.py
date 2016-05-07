@@ -171,8 +171,13 @@ class SegmentedScene:
                                          t.transform.translation.y,
                                          t.transform.translation.z))
 
-    def transform_cloud_to_map(self,cloud):
-        tr_r = self.listener.lookupTransform("map", "head_xtion_depth_optical_frame", rospy.Time())
+    def transform_frame_to_map(self,cloud):
+        print("to map")
+
+        t = self.listener.getLatestCommonTime("map", "head_xtion_rgb_frame")
+        self.listener.waitForTransform("map", "head_xtion_rgb_frame", rospy.Time(0), rospy.Duration(5.0))
+        tr_r = self.listener.lookupTransform("map", "head_xtion_rgb_frame", t)
+
         tr = Transform()
         tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
         tr.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
@@ -181,7 +186,7 @@ class SegmentedScene:
         tr_s.header = std_msgs.msg.Header()
         tr_s.header.stamp = rospy.Time.now()
         tr_s.header.frame_id = 'map'
-        tr_s.child_frame_id = "head_xtion_depth_optical_frame"
+        tr_s.child_frame_id = "head_xtion_rgb_frame"
         tr_s.transform = tr
 
         t_kdl = self.transform_to_kdl(tr_s)
@@ -193,32 +198,82 @@ class SegmentedScene:
         res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
         return res
 
+    def transform_cloud_to_base(self,cloud):
+        print("to base")
 
+        t = self.listener.getLatestCommonTime("base_link", "head_xtion_rgb_frame")
+        self.listener.waitForTransform("base_link", "head_xtion_rgb_frame", t, rospy.Duration(15.0))
+        tr_r = self.listener.lookupTransform("base_link", "head_xtion_rgb_frame", t)
 
-    def __init__(self,indices,input_scene_cloud):
+        tr = Transform()
+        tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
+        tr.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
+
+        tr_s = TransformStamped()
+        tr_s.header = std_msgs.msg.Header()
+        tr_s.header.stamp = rospy.Time.now()
+        tr_s.header.frame_id = 'base_link'
+        tr_s.child_frame_id = "head_xtion_rgb_frame"
+        tr_s.transform = tr
+
+        t_kdl = self.transform_to_kdl(tr_s)
+        points_out = []
+        for p_in in pc2.read_points(cloud):
+            p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
+            points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
+
+        res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
+        return res
+
+    def transform_cloud_to_frame(self,cloud):
+        print("to frame")
+
+        t = self.listener.getLatestCommonTime("head_xtion_rgb_frame", "head_xtion_rgb_optical_frame")
+        self.listener.waitForTransform("head_xtion_rgb_frame", "head_xtion_rgb_optical_frame", t, rospy.Duration(5.0))
+        tr_r = self.listener.lookupTransform("head_xtion_rgb_frame", "head_xtion_rgb_optical_frame", t)
+
+        tr = Transform()
+        tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
+        tr.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
+
+        tr_s = TransformStamped()
+        tr_s.header = std_msgs.msg.Header()
+        tr_s.header.stamp = rospy.Time.now()
+        tr_s.header.frame_id = 'head_xtion_rgb_frame'
+        tr_s.child_frame_id = "head_xtion_rgb_frame"
+        tr_s.transform = tr
+
+        t_kdl = self.transform_to_kdl(tr_s)
+        points_out = []
+        for p_in in pc2.read_points(cloud):
+            p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
+            points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
+
+        res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
+        return res
+
+    def __init__(self,indices,input_scene_cloud,pub):
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.input_scene_cloud = input_scene_cloud
-
         self.listener = tf.TransformListener()
-        if(talk): print("waiting for tf")
-        self.listener.waitForTransform("map", "head_xtion_depth_optical_frame", rospy.Time(), rospy.Duration(4.0))
+        print("waiting for transform")
+        self.listener.waitForTransform("map", "head_xtion_rgb_optical_frame", rospy.Time(0), rospy.Duration(10.0))
+
         if(talk): print("gotcha")
 
+
+
+        pub.publish(mc)
+
+        print("---- INPUT HEADER: ----")
+        print(input_scene_cloud.header)
+        print("POINTS IN INPUT: " + str(len(input_scene_cloud.data)))
         self.waypoint = "None"
-        print("transforming point cloud")
-        translation,rotation = self.listener.lookupTransform("map", "head_xtion_depth_optical_frame", rospy.Time())
-        print("trans: ")
-        print(translation)
-
-        print("rot: ")
-        print(rotation)
-
-        print("got it")
-
-        print("trying kdtree approach")
 
 
+
+        translation,rotation = self.listener.lookupTransform("map", "head_xtion_rgb_optical_frame", rospy.Time())
 
         self.raw_cloud = pc2.read_points(input_scene_cloud)
         int_data = list(self.raw_cloud)
@@ -268,7 +323,6 @@ class SegmentedScene:
             #if(talk): print("got transform: ")
             #if(talk): print(trans_cache[0])
 
-            cluster_mapframe = []
             cluster_camframe = []
 
             model = image_geometry.PinholeCameraModel()
@@ -343,10 +397,6 @@ class SegmentedScene:
                 # transform to map co-ordinates
                 pt_s.point = geometry_msgs.msg.Point(*xyz)
 
-
-
-                cluster_mapframe.append((pt_s.point.x,pt_s.point.y,pt_s.point.z,color_data))
-
                 cur_cluster.data_world.append(pt_s)
 
                 if(pt_s.point.x < min_x):
@@ -395,14 +445,18 @@ class SegmentedScene:
 
             header_cam = std_msgs.msg.Header()
             header_cam.stamp = rospy.Time.now()
-            header_cam.frame_id = 'head_xtion_depth_optical_frame'
+            header_cam.frame_id = 'head_xtion_rgb_optical_frame'
             cur_cluster.segmented_pc_camframe = pc2.create_cloud(header_cam, input_scene_cloud.fields, cluster_camframe)
+
+
 
             header_map = std_msgs.msg.Header()
             header_map.stamp = rospy.Time.now()
             header_map.frame_id = 'map'
-            #cur_cluster.segmented_pc_mapframe = pc2.create_cloud(header_map, input_scene_cloud.fields, cluster_mapframe)
-            cur_cluster.segmented_pc_mapframe = self.transform_cloud_to_map(cur_cluster.segmented_pc_camframe)
+            to_frame = self.transform_cloud_to_frame(input_scene_cloud)
+            to_map = self.transform_frame_to_map(tb)
+            cur_cluster.segmented_pc_mapframe = to_map
+
 
 
             print("centroid:")
@@ -508,6 +562,7 @@ class SOMAClusterTracker:
         self.cur_scene = None
         self.prev_scene = None
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
+        self.pub = rospy.Publisher('/world_modeling/cluster_tracker_intermediate', PointCloud2, queue_size=10)
 
     def reset(self):
         self.cur_scene = None
@@ -525,7 +580,7 @@ class SOMAClusterTracker:
         try:
             out = self.segmentation.seg_service(cloud=data)
 
-            new_scene = SegmentedScene(out,data)
+            new_scene = SegmentedScene(out,data,self.pub)
 
             print("new scene added, with " + str(new_scene.num_clusters) + " clusters")
             self.cur_scene = new_scene
