@@ -14,7 +14,7 @@ from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion
 import sensor_msgs.point_cloud2 as pc2
-import python_pcd
+#import python_pcd
 import tf
 # reg stuff #
 from observation_registration_services.srv import *
@@ -173,18 +173,18 @@ class ViewAlignmentManager:
 
             merged_cloud = self.merge_pcs(transformed_seg_clouds)
 
-        if(merge_and_write):
-            print("-- merging and writing clouds to files --")
-            merged_cloud = self.merge_pcs(obs_clouds)
-            python_pcd.write_pcd("merged_obs_non_aligned.pcd", merged_cloud)
+    #    if(merge_and_write):
+        #    print("-- merging and writing clouds to files --")
+        #    merged_cloud = self.merge_pcs(obs_clouds)
+        #    python_pcd.write_pcd("merged_obs_non_aligned.pcd", merged_cloud)
 
-            merged_cloud = self.merge_pcs(transformed_obs_clouds)
-            python_pcd.write_pcd("merged_obs_aligned.pcd", merged_cloud)
+        #    merged_cloud = self.merge_pcs(transformed_obs_clouds)
+        #    python_pcd.write_pcd("merged_obs_aligned.pcd", merged_cloud)
 
-            merged_cloud = self.merge_pcs(seg_clouds)
-            python_pcd.write_pcd("merged_seg_non_aligned.pcd", merged_cloud)
+        #    merged_cloud = self.merge_pcs(seg_clouds)
+        #    python_pcd.write_pcd("merged_seg_non_aligned.pcd", merged_cloud)
 
-            python_pcd.write_pcd("merged_seg_aligned.pcd", merged_cloud)
+        #    python_pcd.write_pcd("merged_seg_aligned.pcd", merged_cloud)
 
         print("success!")
 
