@@ -27,7 +27,7 @@ if __name__ == '__main__':
     print("sending begin signal")
     begin_obs()
     views = 0
-    while(views < 2):
+    while(views < 5):
         invar = raw_input('press key to take view')
         print("waiting for pointcloud message")
         cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)

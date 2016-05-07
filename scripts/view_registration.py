@@ -128,8 +128,8 @@ class ViewAlignmentManager:
             obs_clouds.append(obs_cloud)
 
             print("looking for transform")
-            c_time = t_st.getLatestCommonTime("map","head_xtion_rgb_frame")
-            trans,rot = t_st.lookupTransform("map","head_xtion_rgb_frame",c_time)
+            c_time = t_st.getLatestCommonTime("map","head_xtion_depth_frame")
+            trans,rot = t_st.lookupTransform("map","head_xtion_depth_frame",c_time)
 
             cur_trans = geometry_msgs.msg.Transform()
             cur_trans.translation.x = trans[0]

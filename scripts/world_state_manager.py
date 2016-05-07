@@ -140,6 +140,11 @@ class WorldStateManager:
 
     def begin_obs(self,req):
         print("-- received signal to begin sequence of observations --")
+        if(self.setup_clean):
+            print("ready to go")
+        else:
+            print("ERROR: node setup not completed yet, wait a sec and try again")
+            return
         self.clean_up_obs()
         return TriggerResponse(True,"Observations Beginning: Assuming all subsequent observations are from the same sequence.")
 
