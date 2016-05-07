@@ -28,6 +28,7 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
 
         c_max = len(cur_scene.cluster_list)
         num_assigned = 0
+        use_core = False
 
         scores = {}
 
@@ -39,9 +40,10 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                     if(prev_cluster.bbox.contains_pointstamped(point.point)):
                         # increment the score if a point in the current cluster is in the bbox of the previous cluster
                         scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
-                        if(prev_cluster.outer_core_bbox.contains_pointstamped(point.point)):
-                            print("point is in outer core!")
-                            scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
+                        if(use_core):
+                            if(prev_cluster.outer_core_bbox.contains_pointstamped(point.point)):
+                                print("point is in outer core!")
+                                scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
 
         print("raw scores")
         # normalise scores
