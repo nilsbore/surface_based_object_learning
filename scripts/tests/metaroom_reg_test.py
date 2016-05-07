@@ -33,8 +33,8 @@ def transform_cloud(cloud,translation,rotation):
     tr_s = TransformStamped()
     tr_s.header = std_msgs.msg.Header()
     tr_s.header.stamp = rospy.Time.now()
-    tr_s.header.frame_id = cloud.header.frame_id
-    tr_s.child_frame_id = "head_xtion_rgb_frame"
+    tr_s.header.frame_id = "head_xtion_rgb_frame"
+    tr_s.child_frame_id = "head_xtion_rgb_optical_frame"
     tr_s.transform = tr
 
     t_kdl = transform_to_kdl(tr_s)
@@ -76,16 +76,56 @@ if __name__ == '__main__':
 
     seg_clouds = []
     obs_clouds = []
-    trans = []
+    obs_transforms = []
     time = []
     for o in observations:
-        seg_clouds.append(o.get_message('object_cloud_camframe'))
-        obs_clouds.append(o.get_message('/head_xtion/depth_registered/points'))
         tf_p = o.get_message('/tf')
         t_st = TransformationStore().msg_to_transformer(tf_p)
-        print(t_st)
-        trans.append(t_s)
-        time.append(o.stamp)
+
+
+
+        cam_cloud = o.get_message('object_cloud_camframe')
+        obs_cloud = o.get_message('/head_xtion/depth_registered/points')
+        t,r = t_st.lookupTransform("head_xtion_rgb_frame","head_xtion_rgb_optical_frame",rospy.Time(0))
+        cam_trans = geometry_msgs.msg.Transform()
+        cam_trans.translation.x = t[0]
+        cam_trans.translation.y = t[1]
+        cam_trans.translation.z = t[2]
+
+        cam_trans.rotation.x = r[0]
+        cam_trans.rotation.y = r[1]
+        cam_trans.rotation.z = r[2]
+        cam_trans.rotation.w = r[3]
+
+
+        cam_cloud = transform_cloud(cam_cloud,cam_trans.translation,cam_trans.rotation)
+        obs_cloud = transform_cloud(obs_cloud,cam_trans.translation,cam_trans.rotation)
+
+
+
+        seg_clouds.append(cam_cloud)
+        obs_clouds.append(obs_cloud)
+
+
+        print("looking for transform")
+        trans,rot = t_st.lookupTransform("map","head_xtion_rgb_frame",rospy.Time(0))
+
+        cur_trans = geometry_msgs.msg.Transform()
+        cur_trans.translation.x = trans[0]
+        cur_trans.translation.y = trans[1]
+        cur_trans.translation.z = trans[2]
+
+        cur_trans.rotation.x = rot[0]
+        cur_trans.rotation.y = rot[1]
+        cur_trans.rotation.z = rot[2]
+        cur_trans.rotation.w = rot[3]
+
+        print(cur_trans)
+        obs_transforms.append(cur_trans)
+
+
+
+        #trans.append(t_st)
 
     print("got: " + str(len(seg_clouds)) + " clouds for object")
 
@@ -96,31 +136,43 @@ if __name__ == '__main__':
 
 
     print("running service call")
-#    obs_xml = "/home/jxy/.semanticMap/20160505/patrol_run_1/room_5/room.xml"
-#    response = reg_serv(observation_xml=obs_xml,additional_views=input_clouds,additional_views_odometry_transforms=input_transforms)
-    response = reg_serv(additional_views=obs_clouds)
+    response = reg_serv(additional_views=obs_clouds,additional_views_odometry_transforms=obs_transforms)
 
     view_trans = response.additional_view_transforms
+    print(view_trans)
 
     cloud_id = 0
+    transformed_obs_clouds = []
+    transformed_seg_clouds = []
     print("-- aligning clouds -- ")
     for transform,obs_cloud,seg_cloud in zip(view_trans,obs_clouds,seg_clouds):
-        print("---")
         rot = transform.rotation
         trs = transform.translation
-        print("rotation: ")
-        print(rot)
-        print("translation: ")
-        print(trs)
+
         transformed_obs_cloud = transform_cloud(obs_cloud,trs,rot)
         transformed_seg_cloud = transform_cloud(seg_cloud,trs,rot)
+
+        transformed_obs_clouds.append(transformed_obs_cloud)
+        transformed_seg_clouds.append(transformed_seg_cloud)
+
         cloud_id+=1
-        print("")
-        python_pcd.write_pcd("obs"+str(cloud_id)+".pcd", transformed_obs_cloud)
-        python_pcd.write_pcd("seg"+str(cloud_id)+".pcd", transformed_seg_cloud)
+        #python_pcd.write_pcd("obs"+str(cloud_id)+".pcd", transformed_obs_cloud)
+        #python_pcd.write_pcd("seg"+str(cloud_id)+".pcd", transformed_seg_cloud)
+
+    merged_cloud = merge_pcs(obs_clouds)
+    python_pcd.write_pcd("merged_obs_non_aligned.pcd", merged_cloud)
+
+    merged_cloud = merge_pcs(transformed_obs_clouds)
+    python_pcd.write_pcd("merged_obs_aligned.pcd", merged_cloud)
 
     merged_cloud = merge_pcs(seg_clouds)
-    python_pcd.write_pcd("merged.pcd", merged_cloud)
+    python_pcd.write_pcd("merged_seg_non_aligned.pcd", merged_cloud)
+
+    merged_cloud = merge_pcs(transformed_seg_clouds)
+    python_pcd.write_pcd("merged_seg_aligned.pcd", merged_cloud)
+
+
+
 
 
 
