@@ -33,7 +33,7 @@ if __name__ == '__main__':
     query.useweekday =  False
     query.useroi =  False
 
-    query.objectids = (["0c9bf930-2b58-4827-9097-67b68ee8c7cf"])
+    query.objectids = (["62e1baff-750a-4108-8ee4-d82c133f3191"])
     query.objecttypes=['']
 
     response = soma_query(query)
@@ -45,14 +45,14 @@ if __name__ == '__main__':
 
     world_model = World(server_host='localhost',server_port=62345)
 
-    obj = world_model.get_object("0c9bf930-2b58-4827-9097-67b68ee8c7cf")
+    obj = world_model.get_object("50b22f1c-c66a-4760-be54-fdf64504a3d9")
     print("done")
 
     observations = obj._observations
 
     clouds = []
     for o in observations:
-        clouds.append(o.get_message('object_cloud_mapframe'))
+        clouds.append(o.get_message('object_cloud'))
 
     print("got: " + str(len(clouds)) + " clouds for object")
 
@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     print("waiting to write...")
 
-    python_pcd.write_pcd("test.pcd", combined_cloud)
+    python_pcd.write_pcd("mug.pcd", combined_cloud)
 
     print("done")
     #rospy.spin()

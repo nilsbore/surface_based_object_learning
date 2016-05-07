@@ -234,6 +234,7 @@ class WorldStateManager:
             # store point cloud for later use
             scene = self.cluster_tracker.add_unsegmented_scene(req.input)
             scene.waypoint = req.waypoint
+            self.assign_clusters(scene)
             self.pending_obs.append(scene)
             print("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
             return WorldUpdateResponse(True)
@@ -243,10 +244,10 @@ class WorldStateManager:
         for scene in self.pending_obs:
             print("processing cloud")
             #if(talk): print("got cloud:" + str(cloud_data.header.seq))
-            try:
-                self.assign_clusters(scene)
-            except rospy.ServiceException, e:
-                if(talk): print "service call failed: %s"%e
+        #    try:
+
+        #    except rospy.ServiceException, e:
+        #        if(talk): print "service call failed: %s"%e
 
         print("-- batch processing complete, attempting post-processing--")
         #self.register_object_views()
