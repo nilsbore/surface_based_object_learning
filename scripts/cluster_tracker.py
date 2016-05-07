@@ -264,7 +264,7 @@ class SegmentedScene:
 
 
 
-        pub.publish(mc)
+
 
         print("---- INPUT HEADER: ----")
         print(input_scene_cloud.header)
@@ -286,6 +286,12 @@ class SegmentedScene:
         cv_image = bridge.imgmsg_to_cv2(scene_img, desired_encoding="bgr8")
         print("got it")
 
+        to_frame = self.transform_cloud_to_frame(input_scene_cloud)
+        to_map = self.transform_frame_to_map(to_frame)
+        map_points = pc2.read_points(to_map)
+        map_points_data = []
+        map_points_int_data = list(map_points)
+
         if(talk): print("loading clusters")
         for root_cluster in indices.clusters_indices:
             if(talk): print("--- CLUSTER ----")
@@ -296,6 +302,7 @@ class SegmentedScene:
             #raw = []
             for idx in root_cluster.data:
                 cur_cluster.data.append(int_data[idx])
+                map_points_data.append(map_points_int_data[idx])
 
             #if(talk): print("i added: " + str(len(cur_cluster.data)) + " points to a cluster")
 
@@ -453,10 +460,8 @@ class SegmentedScene:
             header_map = std_msgs.msg.Header()
             header_map.stamp = rospy.Time.now()
             header_map.frame_id = 'map'
-            to_frame = self.transform_cloud_to_frame(input_scene_cloud)
-            to_map = self.transform_frame_to_map(tb)
-            cur_cluster.segmented_pc_mapframe = to_map
-
+            cur_cluster.segmented_pc_mapframe = pc2.create_cloud(header_map, to_map.fields, map_points_data)
+            pub.publish(to_map)
 
 
             print("centroid:")

@@ -33,7 +33,7 @@ if __name__ == '__main__':
     query.useweekday =  False
     query.useroi =  False
 
-    query.objectids = (["50b22f1c-c66a-4760-be54-fdf64504a3d9"])
+    query.objectids = (["0c9bf930-2b58-4827-9097-67b68ee8c7cf"])
     query.objecttypes=['']
 
     response = soma_query(query)
@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     world_model = World(server_host='localhost',server_port=62345)
 
-    obj = world_model.get_object("50b22f1c-c66a-4760-be54-fdf64504a3d9")
+    obj = world_model.get_object("0c9bf930-2b58-4827-9097-67b68ee8c7cf")
     print("done")
 
     observations = obj._observations
