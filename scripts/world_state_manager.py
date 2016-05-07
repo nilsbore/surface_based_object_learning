@@ -34,15 +34,10 @@ from bayes_people_tracker.msg import PeopleTracker
 from vision_people_logging.msg import LoggingUBD
 from human_trajectory.msg import Trajectories
 
-# registration stuff
-from observation_registration_services.srv import *
-
 
 talk = True
 
 class WorldStateManager:
-
-
 
     def __init__(self,db_hostname,db_port):
         rospy.init_node('world_state_modeling', anonymous = False)
@@ -75,10 +70,7 @@ class WorldStateManager:
         begin_observations = rospy.Service('/begin_observations',Trigger,self.begin_obs)
         end_observations = rospy.Service('/end_observations',Trigger,self.end_obs)
 
-        print("setting up view registration service provided by strands_3d_mapping")
-        rospy.wait_for_service('additional_view_registration_server')
-        self.view_registration_server = rospy.ServiceProxy('additional_view_registration_server',AdditionalViewRegistrationService)
-        print("done")
+
 
         print("setting up SOMA services")
         print("getting insert service")
@@ -98,6 +90,9 @@ class WorldStateManager:
             print("recognition service online")
         else:
             print("no recognition service")
+
+        print("setting up view alignment manager")
+        self.view_alignment_manager = ViewAlignmentManager()
 
         self.clean_up_obs()
 
@@ -145,9 +140,8 @@ class WorldStateManager:
 
     def end_obs(self,req):
         print("-- received signal to terminate sequence of observations --")
-        self.object_segment_batch_run()
+        self.do_view_alignment()
         return TriggerResponse(True,"Observations Ending: Assuming all previous observations were from the same sequence.")
-
 
 
     def assign_people(self,pid):
@@ -240,20 +234,8 @@ class WorldStateManager:
             return WorldUpdateResponse(True)
 
 
-    def object_segment_batch_run(self):
-        for scene in self.pending_obs:
-            print("processing cloud")
-            #if(talk): print("got cloud:" + str(cloud_data.header.seq))
-        #    try:
-
-        #    except rospy.ServiceException, e:
-        #        if(talk): print "service call failed: %s"%e
-
-        print("-- batch processing complete, attempting post-processing--")
-        #self.register_object_views()
-
-    def register_object_views(self):
-        print("-- beginning post-processing")
+    def do_view_alignment(self):
+        print("-- beginning post-processing, attempting view alignment -- ")
         for object_id in self.cur_sequence_obj_ids:
             soma_object = self.get_soma_objects_with_id(object_id)
             print("attempting to process object: " + str(object_id))
@@ -270,18 +252,15 @@ class WorldStateManager:
                 world_object = self.world_model.get_object(object_id)
             except rospy.ServiceException, e:
                 print("DB ERROR")
+                pass
 
             observations = world_object._observations
-            obj_scene_views = []
-            obj_cluster_views = []
+            print("observations for " + str(object_id) + " = " + str(len(observations)))
+            if(len(observations) >= 2):
+                self.view_alignment_manager.register_views(observations)
 
-            for obs in observations:
-                obj_scene_views.append(obs.get_message("/head_xtion/depth_registered/points"))
-                obj_cluster_views.append(obs.get_message("object_cloud_camframe"))
 
-            print("got: " + str(len(obj_scene_views)) + " observations")
 
-            print("attempting to register views with one-another")
             #response = self.view_registration_server(additional_views=obj_scene_views)
 
         print("post-processing complete")

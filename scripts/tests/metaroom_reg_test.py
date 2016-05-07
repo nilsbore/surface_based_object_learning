@@ -82,8 +82,6 @@ if __name__ == '__main__':
         tf_p = o.get_message('/tf')
         t_st = TransformationStore().msg_to_transformer(tf_p)
 
-
-
         cam_cloud = o.get_message('object_cloud_camframe')
         obs_cloud = o.get_message('/head_xtion/depth_registered/points')
         t,r = t_st.lookupTransform("head_xtion_rgb_frame","head_xtion_rgb_optical_frame",rospy.Time(0))
