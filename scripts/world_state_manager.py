@@ -257,8 +257,15 @@ class WorldStateManager:
             observations = world_object._observations
             print("observations for " + str(object_id) + " = " + str(len(observations)))
             if(len(observations) >= 2):
-                self.view_alignment_manager.register_views(observations)
-
+                merged_cloud = self.view_alignment_manager.register_views(observations)
+                message_proxy = MessageStoreProxy(collection="ws_merged_aligned_clouds")
+                msg_id = message_proxy.insert(merged_cloud)
+                mso = MessageStoreObject(
+                    database=message_proxy.database,
+                    collection=message_proxy.collection,
+                    obj_id=msg_id,
+                    typ=merged_cloud._type)
+                world_object._point_cloud = mso
 
 
             #response = self.view_registration_server(additional_views=obj_scene_views)
