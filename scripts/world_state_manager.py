@@ -284,8 +284,8 @@ class WorldStateManager:
                     # update SOMA
                     print("updating SOMA")
                     soma_objects.objects[0].cloud = merged_cloud
-                    
-                    self.soma_update(soma_objects.objects[0],str(soma_objects.objects[0].id))
+
+                    self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
                 except Exception,e:
                     print("problem updating object models in world/SOMA db. Unable to register merged clouds")
                     print(e)
