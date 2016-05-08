@@ -252,6 +252,30 @@ class SegmentedScene:
         res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
         return res
 
+    def get_camera_info_topic(self):
+        camera_msg = None
+        try:
+            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=1)
+        except Exception,e:
+            print("couldn't find /head_xtion/depth_registered/camera_info")
+
+
+        if(camera_msg):
+            print("found topic: /head_xtion/depth_registered/camera_info")
+            return camera_msg
+
+        try:
+            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/sw_registered/camera_info",  CameraInfo, timeout=1)
+        except Exception,e:
+            print("couldn't find /head_xtion/depth_registered/sw_registered/camera_info")
+
+        if(camera_msg):
+            print("found topic: /head_xtion/depth_registered/sw_registered/camera_info")
+            return camera_msg
+
+        return None
+
+
     def __init__(self,indices,input_scene_cloud,pub):
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
@@ -333,8 +357,9 @@ class SegmentedScene:
             cluster_camframe = []
 
             model = image_geometry.PinholeCameraModel()
-            print("waiting for /head_xtion/depth_registered/camera_info")
-            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=3.0)
+            print("waiting for camera_info topic")
+            camera_msg = self.get_camera_info_topic()
+
             model.fromCameraInfo(camera_msg)
 
             rgb_min_x = 90000
