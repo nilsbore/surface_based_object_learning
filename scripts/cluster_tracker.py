@@ -275,6 +275,26 @@ class SegmentedScene:
 
         return None
 
+    def get_moore_neighbourhood(self,point):
+        y = point[0]
+        x = point[1]
+        points = []
+        points.append(point)
+
+        if not(y - 1 < 0):
+            points.append([y-1,x])
+
+        if not(y + 1 > 480):
+            points.append([y+1,x])
+
+        if not(x - 1 < 0):
+            points.append([y,x-1])
+
+        if not(y + 1 > 640):
+            points.append([y,x+1])
+
+        return points
+
 
     def __init__(self,indices,input_scene_cloud,pub):
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
@@ -315,6 +335,7 @@ class SegmentedScene:
         map_points = pc2.read_points(to_map)
         map_points_data = []
         map_points_int_data = list(map_points)
+        rgb_mask = np.zeros(cv_image.shape,np.uint8)
 
         if(talk): print("loading clusters")
         for root_cluster in indices.clusters_indices:
@@ -385,6 +406,12 @@ class SegmentedScene:
 
                 rgb_x = rgb_point[0]
                 rgb_y = rgb_point[1]
+
+                # add this to the mask
+                # this is technically a bit hacky and slow, but on the scale we're doing it
+                # it really doesn't matter
+                for p in self.get_moore_neighbourhood([rgb_y,rgb_x]):
+                    rgb_mask[p[0],p[1]] = [255,255,255]
 
                 if(rgb_x < rgb_min_x):
                     rgb_min_x = rgb_x
@@ -551,7 +578,8 @@ class SegmentedScene:
 
             cur_cluster.cropped_image = bridge.cv2_to_imgmsg(cur_cluster.cv_image_cropped, encoding="bgr8")
 
-            #success = cv2.imwrite(cid+'.jpeg',cv_image_cropped)
+            cur_cluster.rgb_mask = bridge.cv2_to_imgmsg(rgb_mask, encoding="bgr8")
+            #success = cv2.imwrite(cid+'.jpeg',rgb_mask)
 
             #print("cropping succeded:" + str(success))
 

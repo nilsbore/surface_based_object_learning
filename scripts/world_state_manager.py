@@ -432,6 +432,7 @@ class WorldStateManager:
                 #cloud_observation.add_message(cur_scene_cluster.img_bbox,"image_bounding_box")
                 #cloud_observation.add_message(cur_scene_cluster.img_centroid,"image_centroid")
                 cloud_observation.add_message(cur_scene_cluster.cropped_image,"image_cropped")
+                cloud_observation.add_message(cur_scene_cluster.rgb_mask,"rgb_mask")
 
 
                 # store the cropped rgb image for this cluster
