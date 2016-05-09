@@ -100,6 +100,9 @@ class WorldStateManager:
         print("setting up view alignment manager")
         self.view_alignment_manager = ViewAlignmentManager()
 
+        print("looking for camera info topic")
+        self.camera_info_topic = self.get_camera_info_topic_as_string()
+
         self.clean_up_obs()
 
         print("-- node setup completed --")
@@ -153,6 +156,29 @@ class WorldStateManager:
         print("-- received signal to terminate sequence of observations --")
         self.do_view_alignment()
         return TriggerResponse(True,"Observations Ending: Assuming all previous observations were from the same sequence.")
+
+    def get_camera_info_topic_as_string(self):
+        camera_msg = None
+        try:
+            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=1)
+        except Exception,e:
+            print("couldn't find /head_xtion/depth_registered/camera_info")
+
+
+        if(camera_msg):
+            print("found topic: /head_xtion/depth_registered/camera_info")
+            return "/head_xtion/depth_registered/camera_info"
+
+        try:
+            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/sw_registered/camera_info",  CameraInfo, timeout=1)
+        except Exception,e:
+            print("couldn't find /head_xtion/depth_registered/sw_registered/camera_info")
+
+        if(camera_msg):
+            print("found topic: /head_xtion/depth_registered/sw_registered/camera_info")
+            return "/head_xtion/depth_registered/sw_registered/camera_info"
+
+        return None
 
 
     def assign_people(self,pid):
@@ -400,10 +426,13 @@ class WorldStateManager:
                 if(talk): print("making observation")
                 # add an observation for the object
 
+                print("waiting for camera_info topic")
+
+
                 DEFAULT_TOPICS = [("/head_xtion/rgb/image_rect_color", Image),
                                   #("/head_xtion/rgb/camera_info", CameraInfo),
                                   #("/head_xtion/depth/points", PointCloud2),
-                                  ("/head_xtion/depth_registered/camera_info", CameraInfo),
+                                  (self.camera_info_topic, CameraInfo),
                                   ("/head_xtion/depth_registered/points", PointCloud2),
                                   #("/head_xtion/depth/camera_info", CameraInfo),
                                   ("/ptu/state", JointState),
