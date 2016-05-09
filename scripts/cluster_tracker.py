@@ -174,9 +174,9 @@ class SegmentedScene:
     def transform_frame_to_map(self,cloud):
         print("to map")
 
-        t = self.listener.getLatestCommonTime("map", "head_xtion_depth_frame")
-        self.listener.waitForTransform("map", "head_xtion_depth_frame", rospy.Time(0), rospy.Duration(5.0))
-        tr_r = self.listener.lookupTransform("map", "head_xtion_depth_frame", t)
+        t = self.listener.getLatestCommonTime("map", self.child_camera_frame)
+        self.listener.waitForTransform("map", self.child_camera_frame, rospy.Time(0), rospy.Duration(5.0))
+        tr_r = self.listener.lookupTransform("map", self.child_camera_frame, t)
 
         tr = Transform()
         tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
@@ -186,7 +186,7 @@ class SegmentedScene:
         tr_s.header = std_msgs.msg.Header()
         tr_s.header.stamp = rospy.Time.now()
         tr_s.header.frame_id = 'map'
-        tr_s.child_frame_id = "head_xtion_depth_frame"
+        tr_s.child_frame_id = self.child_camera_frame
         tr_s.transform = tr
 
         t_kdl = self.transform_to_kdl(tr_s)
@@ -201,9 +201,9 @@ class SegmentedScene:
     def transform_cloud_to_base(self,cloud):
         print("to base")
 
-        t = self.listener.getLatestCommonTime("base_link", "head_xtion_depth_frame")
-        self.listener.waitForTransform("base_link", "head_xtion_depth_frame", t, rospy.Duration(15.0))
-        tr_r = self.listener.lookupTransform("base_link", "head_xtion_depth_frame", t)
+        t = self.listener.getLatestCommonTime("base_link", self.child_camera_frame)
+        self.listener.waitForTransform("base_link", self.child_camera_frame, t, rospy.Duration(15.0))
+        tr_r = self.listener.lookupTransform("base_link", self.child_camera_frame, t)
 
         tr = Transform()
         tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
@@ -213,7 +213,7 @@ class SegmentedScene:
         tr_s.header = std_msgs.msg.Header()
         tr_s.header.stamp = rospy.Time.now()
         tr_s.header.frame_id = 'base_link'
-        tr_s.child_frame_id = "head_xtion_depth_frame"
+        tr_s.child_frame_id = self.child_camera_frame
         tr_s.transform = tr
 
         t_kdl = self.transform_to_kdl(tr_s)
@@ -228,9 +228,9 @@ class SegmentedScene:
     def transform_cloud_to_frame(self,cloud):
         print("to frame")
 
-        t = self.listener.getLatestCommonTime("head_xtion_depth_frame", "head_xtion_depth_optical_frame")
-        self.listener.waitForTransform("head_xtion_depth_frame", "head_xtion_depth_optical_frame", t, rospy.Duration(5.0))
-        tr_r = self.listener.lookupTransform("head_xtion_depth_frame", "head_xtion_depth_optical_frame", t)
+        t = self.listener.getLatestCommonTime(self.child_camera_frame, self.root_camera_frame)
+        self.listener.waitForTransform(self.child_camera_frame, self.root_camera_frame, t, rospy.Duration(5.0))
+        tr_r = self.listener.lookupTransform(self.child_camera_frame, self.root_camera_frame, t)
 
         tr = Transform()
         tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
@@ -239,8 +239,8 @@ class SegmentedScene:
         tr_s = TransformStamped()
         tr_s.header = std_msgs.msg.Header()
         tr_s.header.stamp = rospy.Time.now()
-        tr_s.header.frame_id = 'head_xtion_depth_frame'
-        tr_s.child_frame_id = "head_xtion_depth_frame"
+        tr_s.header.frame_id = self.child_camera_frame
+        tr_s.child_frame_id = self.root_camera_frame
         tr_s.transform = tr
 
         t_kdl = self.transform_to_kdl(tr_s)
@@ -295,14 +295,34 @@ class SegmentedScene:
 
         return points
 
+    def set_frames(self,cloud):
+        print("RUNNING SET FRAMES")
+        self.root_camera_frame = ""
+        self.child_camera_frame = ""
+        print("camera input:" + str(cloud.header.frame_id))
+
+        if(str(cloud.header.frame_id) == "head_xtion_rgb_optical_frame"):
+            self.root_camera_frame = cloud.header.frame_id
+            self.child_camera_frame = "head_xtion_rgb_frame"
+
+        if(str(cloud.header.frame_id) == "head_xtion_depth_optical_frame"):
+            self.root_camera_frame = cloud.header.frame_id
+            self.child_camera_frame = "head_xtion_depth_frame"
+
+        print("frames are:")
+        print(self.root_camera_frame)
+        print(self.child_camera_frame)
+
 
     def __init__(self,indices,input_scene_cloud,pub):
+        self.set_frames(input_scene_cloud)
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.input_scene_cloud = input_scene_cloud
         self.listener = tf.TransformListener()
+
         print("waiting for transform")
-        self.listener.waitForTransform("map", "head_xtion_depth_optical_frame", rospy.Time(0), rospy.Duration(10.0))
+        self.listener.waitForTransform("map", self.root_camera_frame, rospy.Time(0), rospy.Duration(10.0))
 
         if(talk): print("gotcha")
 
@@ -317,7 +337,7 @@ class SegmentedScene:
 
 
 
-        translation,rotation = self.listener.lookupTransform("map", "head_xtion_depth_optical_frame", rospy.Time())
+        translation,rotation = self.listener.lookupTransform("map", self.root_camera_frame, rospy.Time())
 
         self.raw_cloud = pc2.read_points(input_scene_cloud)
         int_data = list(self.raw_cloud)
@@ -504,7 +524,7 @@ class SegmentedScene:
 
             header_cam = std_msgs.msg.Header()
             header_cam.stamp = rospy.Time.now()
-            header_cam.frame_id = 'head_xtion_depth_optical_frame'
+            header_cam.frame_id = self.root_camera_frame
             cur_cluster.segmented_pc_camframe = pc2.create_cloud(header_cam, input_scene_cloud.fields, cluster_camframe)
 
 

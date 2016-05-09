@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     world_model = World(server_host='localhost',server_port=62345)
 
-    obj = world_model.get_object("c481c98b-6c79-48c8-94cc-a66673bd2de2")
+    obj = world_model.get_object("c6aa42d0-dd94-4d74-8e90-455de09b069d")
     print("done")
 
     observations = obj._observations

@@ -50,8 +50,8 @@ class ViewAlignmentManager:
         tr_s = TransformStamped()
         tr_s.header = std_msgs.msg.Header()
         tr_s.header.stamp = rospy.Time.now()
-        tr_s.header.frame_id = "head_xtion_rgb_frame"
-        tr_s.child_frame_id = "head_xtion_rgb_optical_frame"
+        tr_s.header.frame_id = self.child_camera_frame
+        tr_s.child_frame_id = self.root_camera_frame
         tr_s.transform = tr
 
         t_kdl = self.transform_to_kdl(tr_s)
@@ -80,6 +80,24 @@ class ViewAlignmentManager:
         combined_cloud = pc2.create_cloud(header, clouds[0].fields, combined_cloud_points)
         return combined_cloud
 
+    def set_frames(self,cloud):
+        print("RUNNING SET FRAMES")
+        self.root_camera_frame = ""
+        self.child_camera_frame = ""
+        print("camera input:" + str(cloud.header.frame_id))
+
+        if(str(cloud.header.frame_id) == "head_xtion_rgb_optical_frame"):
+            self.root_camera_frame = cloud.header.frame_id
+            self.child_camera_frame = "head_xtion_rgb_frame"
+
+        if(str(cloud.header.frame_id) == "head_xtion_depth_optical_frame"):
+            self.root_camera_frame = cloud.header.frame_id
+            self.child_camera_frame = "head_xtion_depth_frame"
+
+        print("frames are:")
+        print(self.root_camera_frame)
+        print(self.child_camera_frame)
+
 
     def register_views(self,observations,merge_and_write=False):
         seg_clouds = []
@@ -90,12 +108,13 @@ class ViewAlignmentManager:
             tf_p = o.get_message('/tf')
             t_st = TransformationStore().msg_to_transformer(tf_p)
 
-            cam_cloud = o.get_message('object_cloud_mapframe')
+            cam_cloud = o.get_message('object_cloud_camframe')
             print("cam header: ")
             print(cam_cloud.header)
             obs_cloud = o.get_message('/head_xtion/depth_registered/points')
-            #c_time = t_st.getLatestCommonTime("head_xtion_rgb_frame","head_xtion_rgb_optical_frame")
-            #t,r = t_st.lookupTransform("head_xtion_rgb_frame","head_xtion_rgb_optical_frame",c_time)
+            self.set_frames(obs_cloud)
+            #c_time = t_st.getLatestCommonTime(self.child_camera_frame,self.root_camera_frame)
+            #t,r = t_st.lookupTransform(self.child_camera_frame,self.root_camera_frame,c_time)
             #cam_trans = geometry_msgs.msg.Transform()
             #cam_trans.translation.x = t[0]
             #cam_trans.translation.y = t[1]
@@ -109,8 +128,8 @@ class ViewAlignmentManager:
             #cam_cloud = self.transform_cloud(cam_cloud,cam_trans.translation,cam_trans.rotation)
             #obs_cloud = self.transform_cloud(obs_cloud,cam_trans.translation,cam_trans.rotation)
 
-            #c_time = t_st.getLatestCommonTime("map","head_xtion_rgb_optical_frame")
-            #t,r = t_st.lookupTransform("map","head_xtion_rgb_optical_frame",c_time)
+            #c_time = t_st.getLatestCommonTime("map",self.root_camera_frame)
+            #t,r = t_st.lookupTransform("map",self.root_camera_frame,c_time)
             #cam_trans = geometry_msgs.msg.Transform()
             #cam_trans.translation.x = t[0]
             #cam_trans.translation.y = t[1]
@@ -128,8 +147,8 @@ class ViewAlignmentManager:
             obs_clouds.append(obs_cloud)
 
             print("looking for transform")
-            c_time = t_st.getLatestCommonTime("map","head_xtion_depth_frame")
-            trans,rot = t_st.lookupTransform("map","head_xtion_depth_frame",c_time)
+            c_time = t_st.getLatestCommonTime("map",self.child_camera_frame)
+            trans,rot = t_st.lookupTransform("map",self.child_camera_frame,c_time)
 
             cur_trans = geometry_msgs.msg.Transform()
             cur_trans.translation.x = trans[0]
@@ -190,7 +209,7 @@ class ViewAlignmentManager:
 
         #otp = observations[0].get_message('/tf')
         #otf = TransformationStore().msg_to_transformer(otp)
-        #trans,rot = otf.lookupTransform("head_xtion_rgb_frame","map",rospy.Time(0))
+        #trans,rot = otf.lookupTransform(self.child_camera_frame,"map",rospy.Time(0))
 
         #mt = geometry_msgs.msg.Transform()
         #mt.translation.x = trans[0]

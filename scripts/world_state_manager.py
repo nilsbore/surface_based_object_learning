@@ -441,7 +441,7 @@ class WorldStateManager:
 
                 cloud_observation = Observation.make_observation(DEFAULT_TOPICS)
 
-                # centroid of this object, in the head_xtion_rgb_optical_frame
+                # centroid of this object
                 ws_pose = ws_geom.Pose()
                 ws_pose.position.x = cur_scene_cluster.map_centroid[0]
                 ws_pose.position.y = cur_scene_cluster.map_centroid[1]
@@ -457,6 +457,14 @@ class WorldStateManager:
                 cloud_observation.add_message(cur_scene_cluster.segmented_pc_mapframe,"object_cloud_mapframe")
                 cloud_observation.add_message(cur_scene_cluster.segmented_pc_camframe,"object_cloud_camframe")
 
+                message_proxy = MessageStoreProxy(collection="ws_observations")
+                msg_id = message_proxy.insert(cur_scene_cluster.segmented_pc_mapframe)
+                mso = MessageStoreObject(
+                    database=message_proxy.database,
+                    collection=message_proxy.collection,
+                    obj_id=msg_id,
+                    typ=cur_scene_cluster.segmented_pc_mapframe._type)
+                cur_cluster._point_cloud = mso
 
                 #cloud_observation.add_message(cur_scene_cluster.img_bbox,"image_bounding_box")
                 #cloud_observation.add_message(cur_scene_cluster.img_centroid,"image_centroid")
