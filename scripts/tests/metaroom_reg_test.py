@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     world_model = World(server_host='localhost',server_port=62345)
 
-    obj = world_model.get_object("c6aa42d0-dd94-4d74-8e90-455de09b069d")
+    obj = world_model.get_object("130c4040-50a2-4318-aa25-9b5a1c0b3810")
     print("done")
 
     observations = obj._observations
@@ -83,6 +83,8 @@ if __name__ == '__main__':
         t_st = TransformationStore().msg_to_transformer(tf_p)
 
         cam_cloud = o.get_message('object_cloud_camframe')
+        python_pcd.write_pcd("CCT.pcd", cam_cloud)
+
         obs_cloud = o.get_message('/head_xtion/depth_registered/points')
         t,r = t_st.lookupTransform("head_xtion_rgb_frame","head_xtion_rgb_optical_frame",rospy.Time(0))
         cam_trans = geometry_msgs.msg.Transform()
@@ -98,8 +100,6 @@ if __name__ == '__main__':
 
         cam_cloud = transform_cloud(cam_cloud,cam_trans.translation,cam_trans.rotation)
         obs_cloud = transform_cloud(obs_cloud,cam_trans.translation,cam_trans.rotation)
-
-
 
         seg_clouds.append(cam_cloud)
         obs_clouds.append(obs_cloud)

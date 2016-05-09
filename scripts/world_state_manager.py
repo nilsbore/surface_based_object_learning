@@ -281,19 +281,19 @@ class WorldStateManager:
 
             if(not soma_objects.objects[0]):
                 print("SOMA object doesn't exist")
-                pass
+                continue
             else:
                 print("got this SOMA object")
 
             if(not self.world_model.does_object_exist(object_id)):
                 print("WORLD object doesn't exist")
-                pass
+                continue
 
             try:
                 world_object = self.world_model.get_object(object_id)
             except rospy.ServiceException, e:
                 print("DB ERROR")
-                pass
+                continue
 
             observations = world_object._observations
             print("observations for " + str(object_id) + " = " + str(len(observations)))
@@ -320,7 +320,7 @@ class WorldStateManager:
                 except Exception,e:
                     print("problem updating object models in world/SOMA db. Unable to register merged clouds")
                     print(e)
-                    pass
+                    continue
             else:
                 print("ignoring")
 

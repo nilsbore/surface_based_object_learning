@@ -14,7 +14,7 @@ from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion
 import sensor_msgs.point_cloud2 as pc2
-#import python_pcd
+import python_pcd
 import tf
 # reg stuff #
 from observation_registration_services.srv import *
@@ -113,20 +113,20 @@ class ViewAlignmentManager:
             print(cam_cloud.header)
             obs_cloud = o.get_message('/head_xtion/depth_registered/points')
             self.set_frames(obs_cloud)
-            #c_time = t_st.getLatestCommonTime(self.child_camera_frame,self.root_camera_frame)
-            #t,r = t_st.lookupTransform(self.child_camera_frame,self.root_camera_frame,c_time)
-            #cam_trans = geometry_msgs.msg.Transform()
-            #cam_trans.translation.x = t[0]
-            #cam_trans.translation.y = t[1]
-            #cam_trans.translation.z = t[2]
+            c_time = t_st.getLatestCommonTime(self.child_camera_frame,self.root_camera_frame)
+            t,r = t_st.lookupTransform(self.child_camera_frame,self.root_camera_frame,c_time)
+            cam_trans = geometry_msgs.msg.Transform()
+            cam_trans.translation.x = t[0]
+            cam_trans.translation.y = t[1]
+            cam_trans.translation.z = t[2]
 
-            #cam_trans.rotation.x = r[0]
-            #cam_trans.rotation.y = r[1]
-            #cam_trans.rotation.z = r[2]
-            #cam_trans.rotation.w = r[3]
+            cam_trans.rotation.x = r[0]
+            cam_trans.rotation.y = r[1]
+            cam_trans.rotation.z = r[2]
+            cam_trans.rotation.w = r[3]
 
-            #cam_cloud = self.transform_cloud(cam_cloud,cam_trans.translation,cam_trans.rotation)
-            #obs_cloud = self.transform_cloud(obs_cloud,cam_trans.translation,cam_trans.rotation)
+            cam_cloud = self.transform_cloud(cam_cloud,cam_trans.translation,cam_trans.rotation)
+            obs_cloud = self.transform_cloud(obs_cloud,cam_trans.translation,cam_trans.rotation)
 
             #c_time = t_st.getLatestCommonTime("map",self.root_camera_frame)
             #t,r = t_st.lookupTransform("map",self.root_camera_frame,c_time)
@@ -173,17 +173,17 @@ class ViewAlignmentManager:
         print(view_trans)
 
         cloud_id = 0
-        transformed_obs_clouds = []
+        #transformed_obs_clouds = []
         transformed_seg_clouds = []
         print("-- aligning clouds -- ")
-        for transform,obs_cloud,seg_cloud in zip(view_trans,obs_clouds,seg_clouds):
+        for transform,seg_cloud in zip(view_trans,seg_clouds):
             rot = transform.rotation
             trs = transform.translation
 
-            transformed_obs_cloud = self.transform_cloud(obs_cloud,trs,rot)
+            #transformed_obs_cloud = self.transform_cloud(obs_cloud,trs,rot)
             transformed_seg_cloud = self.transform_cloud(seg_cloud,trs,rot)
 
-            transformed_obs_clouds.append(transformed_obs_cloud)
+            #transformed_obs_clouds.append(transformed_obs_cloud)
             transformed_seg_clouds.append(transformed_seg_cloud)
 
             cloud_id+=1
@@ -207,20 +207,6 @@ class ViewAlignmentManager:
 
         print("success!")
 
-        #otp = observations[0].get_message('/tf')
-        #otf = TransformationStore().msg_to_transformer(otp)
-        #trans,rot = otf.lookupTransform(self.child_camera_frame,"map",rospy.Time(0))
-
-        #mt = geometry_msgs.msg.Transform()
-        #mt.translation.x = trans[0]
-        #mt.translation.y = trans[1]
-        #mt.translation.z = trans[2]
-
-        #mt.rotation.x = rot[0]
-        #mt.rotation.y = rot[1]
-        #mt.rotation.z = rot[2]
-        #mt.rotation.w = rot[3]
-        #merged_cloud = self.transform_cloud(merged_cloud,mt.translation,mt.rotation)
 
         return merged_cloud
 
@@ -228,7 +214,7 @@ if __name__ == '__main__':
     print("hi")
     rospy.init_node('test2', anonymous = False)
     world_model = World(server_host='localhost',server_port=62345)
-    obj = world_model.get_object("bf984790-4935-4f2a-bf95-9d83a28f2565")
+    obj = world_model.get_object("130c4040-50a2-4318-aa25-9b5a1c0b3810")
     print("got object")
 
     print(obj._point_cloud)
@@ -238,6 +224,8 @@ if __name__ == '__main__':
 
     vr = ViewAlignmentManager()
     merged_cloud = vr.register_views(obj._observations, True)
+
+    python_pcd.write_pcd("merged.pcd", merged_cloud)
 
     message_proxy = MessageStoreProxy(collection="ws_merged_aligned_clouds")
     msg_id = message_proxy.insert(merged_cloud)
