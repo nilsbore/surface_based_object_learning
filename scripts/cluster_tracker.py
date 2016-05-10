@@ -147,8 +147,8 @@ class SegmentedScene:
     #def calculate_2d_image_centroid(self,centroid):
     #    model = image_geometry.PinholeCameraModel()
     #    print("waiting for camera")
-    #    camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=3.0)
-    #    model.fromCameraInfo(camera_msg)
+    #    self.camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=3.0)
+    #    model.fromCameraInfo(self.camera_msg)
     #    px = model.project3dToPixel((centroid[0], centroid[1], centroid[2]))
     #    return px
 
@@ -253,25 +253,25 @@ class SegmentedScene:
         return res
 
     def get_camera_info_topic(self):
-        camera_msg = None
+        self.camera_msg = None
         try:
-            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=1)
+            self.camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=1)
         except Exception,e:
             print("couldn't find /head_xtion/depth_registered/camera_info")
 
 
-        if(camera_msg):
+        if(self.camera_msg):
             print("found topic: /head_xtion/depth_registered/camera_info")
-            return camera_msg
+            return self.camera_msg
 
         try:
-            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/sw_registered/camera_info",  CameraInfo, timeout=1)
+            self.camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/sw_registered/camera_info",  CameraInfo, timeout=1)
         except Exception,e:
             print("couldn't find /head_xtion/depth_registered/sw_registered/camera_info")
 
-        if(camera_msg):
+        if(self.camera_msg):
             print("found topic: /head_xtion/depth_registered/sw_registered/camera_info")
-            return camera_msg
+            return self.camera_msg
 
         return None
 
@@ -320,6 +320,11 @@ class SegmentedScene:
         self.num_clusters = len(indices.clusters_indices)
         self.input_scene_cloud = input_scene_cloud
         self.listener = tf.TransformListener()
+        self.camera_msg = self.get_camera_info_topic()
+        if(self.camera_msg is None):
+            print("Unable to locate camera_info topic")
+            print("Exiting")
+            return
 
         print("waiting for transform")
         self.listener.waitForTransform("map", self.root_camera_frame, rospy.Time(0), rospy.Duration(10.0))
@@ -399,9 +404,9 @@ class SegmentedScene:
 
             model = image_geometry.PinholeCameraModel()
             print("waiting for camera_info topic")
-            camera_msg = self.get_camera_info_topic()
 
-            model.fromCameraInfo(camera_msg)
+
+            model.fromCameraInfo(self.camera_msg)
 
             rgb_min_x = 90000
             rgb_max_x = 0
@@ -711,7 +716,7 @@ class SegmentationWrapper:
         #try:
             #bridge = CvBridge()
             #cv_image = bridge.imgmsg_to_cv2(data,desired_encoding="passthrough")
-            #cv.SaveImage("depth_camera_msg"+str(data.header.seq)+".png", cv.fromarray(cv_image))
+            #cv.SaveImage("depth_self.camera_msg"+str(data.header.seq)+".png", cv.fromarray(cv_image))
             if(talk): print "mask saved!"
         #except CvBridgeError, e:
           #if(talk): print e
