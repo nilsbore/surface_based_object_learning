@@ -45,6 +45,14 @@ class WorldStateManager:
         self.setup_clean = False
         if(talk): print("Manager Online")
         # make a cluster tracker
+        print("looking for camera info topic")
+        self.camera_info_topic = self.get_camera_info_topic_as_string()
+        if(self.camera_info_topic is None):
+            print("Unable to find camera_info topic for depth camera")
+            print("Setup of node failed")
+            return
+
+
         self.world_model = World(server_host=db_hostname,server_port=int(db_port))
         if(talk): print("world model done")
 
@@ -100,8 +108,6 @@ class WorldStateManager:
         print("setting up view alignment manager")
         self.view_alignment_manager = ViewAlignmentManager()
 
-        print("looking for camera info topic")
-        self.camera_info_topic = self.get_camera_info_topic_as_string()
 
         self.clean_up_obs()
 
@@ -160,16 +166,6 @@ class WorldStateManager:
     def get_camera_info_topic_as_string(self):
         camera_msg = None
         try:
-            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=1)
-        except Exception,e:
-            print("couldn't find /head_xtion/depth_registered/camera_info")
-
-
-        if(camera_msg):
-            print("found topic: /head_xtion/depth_registered/camera_info")
-            return "/head_xtion/depth_registered/camera_info"
-
-        try:
             camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/sw_registered/camera_info",  CameraInfo, timeout=1)
         except Exception,e:
             print("couldn't find /head_xtion/depth_registered/sw_registered/camera_info")
@@ -177,6 +173,15 @@ class WorldStateManager:
         if(camera_msg):
             print("found topic: /head_xtion/depth_registered/sw_registered/camera_info")
             return "/head_xtion/depth_registered/sw_registered/camera_info"
+
+        try:
+            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=1)
+        except Exception,e:
+            print("couldn't find /head_xtion/depth_registered/camera_info")
+
+        if(camera_msg):
+            print("found topic: /head_xtion/depth_registered/camera_info")
+            return "/head_xtion/depth_registered/camera_info"
 
         return None
 
@@ -425,9 +430,6 @@ class WorldStateManager:
                 # so first add a new observation to it, in all cases
                 if(talk): print("making observation")
                 # add an observation for the object
-
-                print("waiting for camera_info topic")
-
 
                 DEFAULT_TOPICS = [("/head_xtion/rgb/image_rect_color", Image),
                                   #("/head_xtion/rgb/camera_info", CameraInfo),
