@@ -478,9 +478,8 @@ class WorldStateManager:
             #    print("result: ")
             #    print(res)
                 try:
-                    self.recognition_service = rospy.wait_for_service('/recognition_service/sv_recognition',5)
                     print("recognition online")
-                    recog_out = self.recognition_service(cur_scene_cluster.segmented_pc_mapframe)
+                    recog_out = self.recog_service(cur_scene_cluster.segmented_pc_mapframe)
 
                     # this should give us back #
                     labels = recog_out.ids
