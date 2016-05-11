@@ -51,6 +51,8 @@ class WorldStateManager:
             print("Unable to find camera_info topic for depth camera")
             print("Setup of node failed")
             return
+        else:
+            print("camera info topic found at: " + self.camera_info_topic)
 
 
         self.world_model = World(server_host=db_hostname,server_port=int(db_port))
@@ -166,22 +168,17 @@ class WorldStateManager:
     def get_camera_info_topic_as_string(self):
         camera_msg = None
         try:
-            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/sw_registered/camera_info",  CameraInfo, timeout=5)
+            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/sw_registered/camera_info",  CameraInfo, timeout=2)
+            return "/head_xtion/depth_registered/sw_registered/camera_info"
         except Exception,e:
             print("couldn't find /head_xtion/depth_registered/sw_registered/camera_info")
 
-        if(camera_msg):
-            print("found topic: /head_xtion/depth_registered/sw_registered/camera_info")
-            return "/head_xtion/depth_registered/sw_registered/camera_info"
-
-        try:
-            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=5)
-        except Exception,e:
-            print("couldn't find /head_xtion/depth_registered/camera_info")
-
-        if(camera_msg):
-            print("found topic: /head_xtion/depth_registered/camera_info")
-            return "/head_xtion/depth_registered/camera_info"
+        if(not camera_msg):
+            try:
+                camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=2)
+                return "/head_xtion/depth_registered/camera_info"
+            except Exception,e:
+                print("couldn't find /head_xtion/depth_registered/camera_info")
 
         return None
 
