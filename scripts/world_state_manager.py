@@ -166,7 +166,7 @@ class WorldStateManager:
     def get_camera_info_topic_as_string(self):
         camera_msg = None
         try:
-            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/sw_registered/camera_info",  CameraInfo, timeout=1)
+            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/sw_registered/camera_info",  CameraInfo, timeout=5)
         except Exception,e:
             print("couldn't find /head_xtion/depth_registered/sw_registered/camera_info")
 
@@ -175,7 +175,7 @@ class WorldStateManager:
             return "/head_xtion/depth_registered/sw_registered/camera_info"
 
         try:
-            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=1)
+            camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=5)
         except Exception,e:
             print("couldn't find /head_xtion/depth_registered/camera_info")
 
