@@ -301,12 +301,12 @@ class SegmentedScene:
         self.child_camera_frame = ""
         print("camera input:" + str(cloud.header.frame_id))
 
-        if(str(cloud.header.frame_id) in "head_xtion_rgb_optical_frame"):
+        if("head_xtion_rgb_optical_frame" in str(cloud.header.frame_id)):
             print("found head_xtion_rgb_optical_frame")
             self.root_camera_frame = cloud.header.frame_id
             self.child_camera_frame = "head_xtion_rgb_frame"
 
-        if(str(cloud.header.frame_id) in "head_xtion_depth_optical_frame"):
+        if("head_xtion_depth_optical_frame" in str(cloud.header.frame_id)):
             print("found head_xtion_depth_optical_frame")
             self.root_camera_frame = cloud.header.frame_id
             self.child_camera_frame = "head_xtion_depth_frame"
