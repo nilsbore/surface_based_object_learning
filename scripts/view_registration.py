@@ -14,7 +14,7 @@ from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion
 import sensor_msgs.point_cloud2 as pc2
-import python_pcd
+#import python_pcd
 import tf
 # reg stuff #
 from observation_registration_services.srv import *
