@@ -175,7 +175,7 @@ class SegmentedScene:
         print("to map")
 
         t = self.listener.getLatestCommonTime("map", self.child_camera_frame)
-        self.listener.waitForTransform("map", self.child_camera_frame, rospy.Time(0), rospy.Duration(5.0))
+        self.listener.waitForTransform("map", self.child_camera_frame, t, rospy.Duration(5.0))
         tr_r = self.listener.lookupTransform("map", self.child_camera_frame, t)
 
         tr = Transform()
@@ -321,6 +321,10 @@ class SegmentedScene:
         self.num_clusters = len(indices.clusters_indices)
         self.input_scene_cloud = input_scene_cloud
         self.listener = tf.TransformListener()
+
+        # let the listener grab a few frames of tf
+        rospy.sleep(1)
+
         self.camera_msg = self.get_camera_info_topic()
         if(self.camera_msg is None):
             print("Unable to locate camera_info topic")
@@ -328,7 +332,13 @@ class SegmentedScene:
             return
 
         print("waiting for transform")
-        self.listener.waitForTransform("map", self.root_camera_frame, rospy.Time(0), rospy.Duration(10.0))
+        try:
+            t = self.listener.getLatestCommonTime("map", self.root_camera_frame)
+            self.listener.waitForTransform("map", self.root_camera_frame, t, rospy.Duration(10.0))
+        except rospy.ServiceException, e:
+            print("Unable to find transform between camera frame and map frame")
+            print(e)
+
 
         if(talk): print("gotcha")
 
