@@ -317,6 +317,7 @@ class SegmentedScene:
 
     def __init__(self,indices,input_scene_cloud,pub):
         self.set_frames(input_scene_cloud)
+        self.clean_setup = False
         if(talk): print("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.input_scene_cloud = input_scene_cloud
@@ -338,6 +339,7 @@ class SegmentedScene:
         except rospy.ServiceException, e:
             print("Unable to find transform between camera frame and map frame")
             print(e)
+            return
 
 
         if(talk): print("gotcha")
@@ -643,7 +645,7 @@ class SegmentedScene:
 
         #   if(talk): print("is centre point in bbox? " + str(cur_cluster.bbox.contains_point(cur_cluster.map_centroid)))
             self.cluster_list.append(cur_cluster)
-
+            self.clean_setup = True
 
 
 

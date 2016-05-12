@@ -265,12 +265,22 @@ class WorldStateManager:
             return WorldUpdateResponse(False)
         else:
             # store point cloud for later use
-            scene = self.cluster_tracker.add_unsegmented_scene(req.input)
-            scene.waypoint = req.waypoint
-            self.assign_clusters(scene)
-            self.pending_obs.append(scene)
-            print("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
-            return WorldUpdateResponse(True)
+            try:
+                scene = self.cluster_tracker.add_unsegmented_scene(req.input)
+                if(scene.clean_setup is True):
+                    scene.waypoint = req.waypoint
+                    self.assign_clusters(scene)
+                    self.pending_obs.append(scene)
+                    print("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
+                    return WorldUpdateResponse(True)
+                else:
+                    print("Error in processing scene")
+            except Exception,e:
+                print("Unable to segment and proces this scene")
+                print(e)
+
+            return WorldUpdateResponse(False)
+
 
 
     def do_view_alignment(self):
