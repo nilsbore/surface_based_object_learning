@@ -352,10 +352,8 @@ class SegmentedScene:
         print(input_scene_cloud.header)
         print("POINTS IN INPUT: " + str(len(input_scene_cloud.data)))
         self.waypoint = "None"
-
-
-
-        translation,rotation = self.listener.lookupTransform("map", self.root_camera_frame, rospy.Time())
+        t = self.listener.getLatestCommonTime("map", self.root_camera_frame)
+        translation,rotation = self.listener.lookupTransform("map", self.root_camera_frame, t)
 
         self.raw_cloud = pc2.read_points(input_scene_cloud)
         int_data = list(self.raw_cloud)
@@ -371,13 +369,13 @@ class SegmentedScene:
         to_frame = self.transform_cloud_to_frame(input_scene_cloud)
         to_map = self.transform_frame_to_map(to_frame)
         map_points = pc2.read_points(to_map)
-        map_points_data = []
         map_points_int_data = list(map_points)
-        rgb_mask = np.zeros(cv_image.shape,np.uint8)
 
         if(talk): print("loading clusters")
         for root_cluster in indices.clusters_indices:
-            if(talk): print("--- CLUSTER ----")
+            map_points_data = []
+            rgb_mask = np.zeros(cv_image.shape,np.uint8)
+            print("--- CLUSTER ----")
 
             cid = str(uuid.uuid4()) # str so we can later link it to a soma2 object, which indexes by string
             if(talk): print("randomly assigned temporary cid: " + str(cid))
@@ -387,7 +385,7 @@ class SegmentedScene:
                 cur_cluster.data.append(int_data[idx])
                 map_points_data.append(map_points_int_data[idx])
 
-            #if(talk): print("i added: " + str(len(cur_cluster.data)) + " points to a cluster")
+            print("i added: " + str(len(cur_cluster.data)) + " points to a cluster")
 
             # make some space for calculating the world centroid of the cluster
             x = 0

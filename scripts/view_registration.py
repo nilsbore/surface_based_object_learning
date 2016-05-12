@@ -23,10 +23,6 @@ import tf2_ros
 
 class ViewAlignmentManager:
 
-
-
-
-
     def __init__(self):
         #rospy.init_node('world_modeling_view_alignment', anonymous = True)
         print("---created view alignment manager --")
