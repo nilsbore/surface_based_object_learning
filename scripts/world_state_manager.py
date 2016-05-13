@@ -408,7 +408,7 @@ class WorldStateManager:
             print("did segmentation fail?")
             return
 
-
+        text_file = open("output.txt", "w")
         for cur_scene_cluster in cur_scene.cluster_list:
 
             cur_cluster = None
@@ -424,10 +424,12 @@ class WorldStateManager:
                         if(talk): print("got existing object")
                         print("getting EXISTING cluster with id: " + cur_scene_cluster.cluster_id)
                         cur_cluster = self.world_model.get_object(cur_scene_cluster.cluster_id)
+                        text_file.write(cur_scene_cluster.cluster_id+"\n")
 
             if not cur_cluster:
                 if(talk): print("creating NEW cluster with id: " + str(cur_scene_cluster.cluster_id))
                 cur_cluster = self.world_model.create_object(cur_scene_cluster.cluster_id)
+                text_file.write(cur_scene_cluster.cluster_id+"\n")
                 cur_cluster._parent = cur_scene.waypoint
                 self.cur_sequence_obj_ids.append(cur_scene_cluster.cluster_id)
 
@@ -552,6 +554,7 @@ class WorldStateManager:
 
                 if(talk): print("done")
 
+        text_file.close()
 
         # next we need to clean up the scene, and mark anything no longer observable
         # as not live
