@@ -683,9 +683,7 @@ class SOMAClusterTracker:
                 print("we have a previous observation to compare to")
                 tracker = VotingBasedClusterTrackingStrategy()
                 tracker.track(self.cur_scene,self.prev_scene)
-                new_scene.prev_scene = self.prev_scene
             else:
-                new_scene.prev_scene = None
                 print("no previous scene to compare to, skipping merging step, all clusters regarded as new")
         except rospy.ServiceException, e:
             if(talk): print("Failed Segmentation: ")

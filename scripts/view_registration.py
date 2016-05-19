@@ -77,18 +77,16 @@ class ViewAlignmentManager:
         return combined_cloud
 
     def set_frames(self,cloud):
-        print("RUNNING SET FRAMES")
-        self.root_camera_frame = ""
-        self.child_camera_frame = ""
+        print("VIEW REG RUNNING SET FRAMES")
+
+        # set some easy defaults
+        self.root_camera_frame = "head_xtion_depth_optical_frame"
+        self.child_camera_frame = "head_xtion_depth_frame"
         print("camera input:" + str(cloud.header.frame_id))
 
-        if(str(cloud.header.frame_id) in "head_xtion_rgb_optical_frame"):
+        if("head_xtion_rgb_optical_frame" in str(cloud.header.frame_id)):
             self.root_camera_frame = cloud.header.frame_id
             self.child_camera_frame = "head_xtion_rgb_frame"
-
-        if(str(cloud.header.frame_id) in "head_xtion_depth_optical_frame"):
-            self.root_camera_frame = cloud.header.frame_id
-            self.child_camera_frame = "head_xtion_depth_frame"
 
         print("frames are:")
         print(self.root_camera_frame)

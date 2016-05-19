@@ -269,7 +269,7 @@ class WorldStateManager:
                 scene = self.cluster_tracker.add_unsegmented_scene(req.input)
                 if(scene.clean_setup is True):
                     scene.waypoint = req.waypoint
-                    self.assign_clusters(scene)
+                    self.assign_clusters(scene,self.cluster_tracker.prev_scene)
                     self.pending_obs.append(scene)
                     print("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
                     return WorldUpdateResponse(True)
@@ -388,10 +388,9 @@ class WorldStateManager:
 
         return response
 
-    def assign_clusters(self,scene):
+    def assign_clusters(self,scene,prev_scene):
         if(talk): print("assigning")
         cur_scene = scene
-        prev_scene = scene.prev_scene
 
         if(talk): print("waiting for insert service")
 
@@ -535,9 +534,9 @@ class WorldStateManager:
                         cur_soma_obj.cloud = cur_scene_cluster.segmented_pc_mapframe
 
                         soma_pose = geometry_msgs.msg.Pose()
-                        soma_pose.position.x = cur_scene_cluster.local_centroid[0]
-                        soma_pose.position.y = cur_scene_cluster.local_centroid[1]
-                        soma_pose.position.z = cur_scene_cluster.local_centroid[2]
+                        soma_pose.position.x = cur_scene_cluster.map_centroid[0]
+                        soma_pose.position.y = cur_scene_cluster.map_centroid[1]
+                        soma_pose.position.z = cur_scene_cluster.map_centroid[2]
 
                         cur_soma_obj.pose = soma_pose
                         msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
