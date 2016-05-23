@@ -33,7 +33,10 @@ class ROIFilter:
         rospy.loginfo("setting up proxy")
         soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
         rospy.loginfo("done")
-        rospy.loginfo("making query")
+        self.gather_rois()
+
+
+    def gather_rois(self):
         query = SOMA2QueryObjsRequest()
         query.query_type = 2
         response = soma_query(query)
@@ -51,6 +54,11 @@ class ROIFilter:
         rospy.loginfo("ROI Filter has located %d regions of interest",len(self.soma_polygons))
 
     def point_in_roi(self,point_in):
+
+        # allows the system to deal with changes made to ROIs online
+        # and avoid having to be reloaded
+        self.gather_rois()
+
         point = Point(point_in[0],point_in[1])
         for polygon in self.soma_polygons:
             if(polygon.contains(point)):
