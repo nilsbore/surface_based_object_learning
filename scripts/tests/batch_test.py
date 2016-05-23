@@ -32,8 +32,10 @@ if __name__ == '__main__':
         print("waiting for pointcloud message")
         cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
         print("got a pointcloud, calling service")
-        world_update(input=cloud,waypoint="WayPoint32")
+        response = world_update(input=cloud,waypoint="WayPoint32")
         print("done")
+        print("service response: ")
+        print(response)
         views+=1
 
     print("sending end signal")

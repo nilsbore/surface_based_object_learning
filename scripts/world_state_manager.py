@@ -61,6 +61,7 @@ class WorldStateManager:
         self.cluster_tracker = SOMAClusterTracker()
         self.pending_obs = []
         self.cur_sequence_obj_ids = []
+        self.cur_view_soma_ids = []
 
         # TODO: THIS NEEDS TO BE *REGISTERED* EVENTUALLY
         self.transform_store = TransformationStore()
@@ -134,6 +135,8 @@ class WorldStateManager:
     def clean_up_obs(self):
         rospy.loginfo("running cleanup")
         self.pending_obs = []
+        self.cur_sequence_obj_ids = []
+        self.cur_view_soma_ids = []
         self.cluster_tracker.reset()
 
         try:
@@ -152,7 +155,6 @@ class WorldStateManager:
             rospy.logerr("Failed to clean up obs due to DB error")
             rospy.logerr(e)
 
-
     def begin_obs(self,req):
         rospy.loginfo("-- received signal to begin sequence of observations --")
         if(self.setup_clean):
@@ -162,7 +164,6 @@ class WorldStateManager:
             return
         self.clean_up_obs()
         return TriggerResponse(True,"Observations Beginning: Assuming all subsequent observations are from the same sequence.")
-
 
     def end_obs(self,req):
         rospy.loginfo("-- received signal to terminate sequence of observations --")
@@ -185,7 +186,6 @@ class WorldStateManager:
                 rospy.loginfo("couldn't find /head_xtion/depth_registered/camera_info")
 
         return None
-
 
     def assign_people(self,pid):
         rospy.loginfo("assigning")
@@ -261,12 +261,11 @@ class WorldStateManager:
         # update this object in some way
         # TODO: HOW?
 
-
     def object_segment_callback(self, req):
         if(self.setup_clean is False):
             rospy.logerr("-- world_modeling node is missing one or more key services, cannot act --")
             rospy.logerr("-- run services and then re-start me --")
-            return WorldUpdateResponse(False)
+            return WorldUpdateResponse(False,self.cur_view_soma_ids)
         else:
             # store point cloud for later use
             try:
@@ -276,16 +275,14 @@ class WorldStateManager:
                     self.assign_clusters(scene,self.cluster_tracker.prev_scene)
                     self.pending_obs.append(scene)
                     rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
-                    return WorldUpdateResponse(True)
+                    return WorldUpdateResponse(True,self.cur_view_soma_ids)
                 else:
                     rospy.loginfo("Error in processing scene")
             except Exception,e:
                 rospy.logerr("Unable to segment and proces this scene")
                 rospy.logerr(e)
 
-            return WorldUpdateResponse(False)
-
-
+            return WorldUpdateResponse(False,self.cur_view_soma_ids)
 
     def do_view_alignment(self):
         rospy.loginfo("-- beginning post-processing, attempting view alignment -- ")
@@ -343,9 +340,6 @@ class WorldStateManager:
 
         rospy.loginfo("post-processing complete")
 
-
-
-
     def cluster_is_live(self,cluster_id,waypoint):
         if(talk): rospy.loginfo("seeing if object exists:" + str(cluster_id) +" in: " + waypoint)
         exists = self.world_model.does_object_exist(cluster_id)
@@ -371,7 +365,6 @@ class WorldStateManager:
         soma_insert = rospy.ServiceProxy('soma2/insert_objects',SOMA2InsertObjs)
         soma_insert(obj)
 
-
     def get_soma_objects_with_id(self,id):
         rospy.loginfo("looking for SOMA objects with id: " + str(id))
         query = SOMA2QueryObjsRequest()
@@ -394,6 +387,7 @@ class WorldStateManager:
     def assign_clusters(self,scene,prev_scene):
         if(talk): rospy.loginfo("assigning")
         cur_scene = scene
+        self.cur_view_soma_ids = []
 
         if(talk): rospy.loginfo("waiting for insert service")
 
@@ -410,7 +404,6 @@ class WorldStateManager:
             rospy.loginfo("did segmentation fail?")
             return
 
-        text_file = open("output.txt", "w")
         for cur_scene_cluster in cur_scene.cluster_list:
 
             cur_cluster = None
@@ -426,12 +419,10 @@ class WorldStateManager:
                         if(talk): rospy.loginfo("got existing object")
                         rospy.loginfo("getting EXISTING cluster with id: " + cur_scene_cluster.cluster_id)
                         cur_cluster = self.world_model.get_object(cur_scene_cluster.cluster_id)
-                        text_file.write(cur_scene_cluster.cluster_id+"\n")
 
             if not cur_cluster:
                 if(talk): rospy.loginfo("creating NEW cluster with id: " + str(cur_scene_cluster.cluster_id))
                 cur_cluster = self.world_model.create_object(cur_scene_cluster.cluster_id)
-                text_file.write(cur_scene_cluster.cluster_id+"\n")
                 cur_cluster._parent = cur_scene.waypoint
                 self.cur_sequence_obj_ids.append(cur_scene_cluster.cluster_id)
 
@@ -550,11 +541,10 @@ class WorldStateManager:
                     except Exception, e:
                         rospy.logerr("unable to insert into SOMA. Is the database server running?")
 
+                # record all SOMA objects seen in this view
+                self.cur_view_soma_ids.append(cur_cluster.key)
 
                 if(talk): rospy.loginfo("done")
-
-        text_file.close()
-
         # next we need to clean up the scene, and mark anything no longer observable
         # as not live
         if(prev_scene and cur_scene):
