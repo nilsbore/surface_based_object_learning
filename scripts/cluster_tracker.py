@@ -369,7 +369,7 @@ class SegmentedScene:
         # rospy.loginfo("loading clusters")
         rospy.loginfo("Located: %d candidate clusters", len(indices.clusters_indices))
         rospy.loginfo("ROI Filtering is ON")
-        
+
         for root_cluster in indices.clusters_indices:
             map_points_data = []
             rgb_mask = np.zeros(cv_image.shape,np.uint8)

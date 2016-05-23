@@ -35,6 +35,7 @@ from bayes_people_tracker.msg import PeopleTracker
 from vision_people_logging.msg import LoggingUBD
 from human_trajectory.msg import Trajectories
 
+import uuid
 
 talk = True
 
@@ -136,6 +137,7 @@ class WorldStateManager:
         self.cur_sequence_obj_ids = []
         self.cur_view_soma_ids = []
         self.cluster_tracker.reset()
+        self.view_episode_id = str(uuid.uuid4())
 
         try:
             # TODO: have to hack this due to issue with world_model code I'd rather not touch for now
@@ -463,7 +465,9 @@ class WorldStateManager:
                     collection=message_proxy.collection,
                     obj_id=msg_id,
                     typ=cur_scene_cluster.segmented_pc_mapframe._type)
+
                 cur_cluster._point_cloud = mso
+                cur_cluster.view_episode_id = self.view_episode_id
 
                 #cloud_observation.add_message(cur_scene_cluster.img_bbox,"image_bounding_box")
                 #cloud_observation.add_message(cur_scene_cluster.img_centroid,"image_centroid")
