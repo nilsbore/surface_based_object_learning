@@ -82,8 +82,6 @@ class WorldStateManager:
         begin_observations = rospy.Service('/begin_observations',Trigger,self.begin_obs)
         end_observations = rospy.Service('/end_observations',Trigger,self.end_obs)
 
-
-
         rospy.loginfo("setting up SOMA services")
         rospy.loginfo("getting SOMA insert service")
         rospy.wait_for_service('soma2/insert_objects')
