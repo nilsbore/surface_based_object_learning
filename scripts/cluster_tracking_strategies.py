@@ -9,18 +9,18 @@ import Queue as q
 class ClusterTrackingStrategy:
     def __init__(self):
         self.talk = True
-        if(self.talk): print("-- Using tracking strategy: ")
+        rospy.loginfo("-- Using tracking strategy: ")
 
 
     def track(self,cur_scene,prev_scene):
-        if(self.talk): print("-- Performing Tracking")
+        rospy.loginfo("-- Performing Tracking")
 
 
 class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
     def track(self,cur_scene,prev_scene):
-        if(self.talk): print("VotingBasedClusterTrackingStrategy")
-        if(self.talk): print(""+str(len(cur_scene.cluster_list)) + " clusters in cur scene")
-        if(self.talk): print(""+str(len(prev_scene.cluster_list)) + " clusters in prev scene")
+        rospy.loginfo("VotingBasedClusterTrackingStrategy")
+        rospy.loginfo(""+str(len(cur_scene.cluster_list)) + " clusters in this scene")
+        rospy.loginfo(""+str(len(prev_scene.cluster_list)) + " clusters in previous scene")
 
         # set all clusters to be unassigned
         cur_scene.reset_cluster_assignments()
@@ -42,14 +42,14 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                         scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
                         if(use_core):
                             if(prev_cluster.outer_core_bbox.contains_pointstamped(point.point)):
-                                print("point is in outer core!")
+                                #rospy.loginfo("point is in outer core!")
                                 scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
 
-        print("raw scores")
+        rospy.loginfo("raw scores")
         # normalise scores
         for s in scores:
             scores[s].score = (float)(scores[s].score)/(len(scores[s].one.data_world))
-            print(str(scores[s].score))
+            rospy.loginfo(str(scores[s].score))
 
         # assign cluster
         for i in scores:
@@ -66,15 +66,14 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                                 best_cluster = can
 
                 if(best_cluster != None):
-                    if(self.talk): print("best score for: " + str(cur_scene.cluster_list.index(cur))  + " is: " + str(best_score) +" at best cluster: " + str(prev_scene.cluster_list.index(best_cluster)))
+                    rospy.loginfo("best score for: " + str(cur_scene.cluster_list.index(cur))  + " is: " + str(best_score) +" at best cluster: " + str(prev_scene.cluster_list.index(best_cluster)))
                     scores[i].one.assigned = True
                     scores[i].two.assigned = True
-                    if(self.talk): print("assigned cluster with index " + str(cur_scene.cluster_list.index(cur))  + " in cur frame, to prev cluster with index " + str(prev_scene.cluster_list.index(best_cluster)))
+                    rospy.loginfo("assigned cluster with index " + str(cur_scene.cluster_list.index(cur))  + " in cur frame, to prev cluster with index " + str(prev_scene.cluster_list.index(best_cluster)))
                     cur.cluster_id = best_cluster.cluster_id
-                    if(self.talk): print("that cluster UUID is: " + str(best_cluster.cluster_id))
+                    rospy.loginfo("that cluster UUID is: " + str(best_cluster.cluster_id))
                 else:
-                    if(self.talk): print("Couldn't find a good cluster for cluster: " + scores[i].one.cluster_id)
-                    if(self.talk): print("(May be a brand new segment, or incomparable to previously seen segments)")
+                    rospy.loginfo("Couldn't find a good cluster for cluster: " + scores[i].one.cluster_id + "(May be a brand new segment, or incomparable to previously seen segments)")
 
 class ClusterScore:
     def __init__(self,one,two,score):
@@ -88,9 +87,9 @@ class ClusterScore:
 
 class NaiveClusterTrackingStrategy(ClusterTrackingStrategy):
     def track(self,cur_scene,prev_scene):
-        if(self.talk): print("NaiveClusterTrackingStrategy")
-        if(self.talk): print(""+str(len(cur_scene.cluster_list)) + " clusters in cur scene")
-        if(self.talk): print(""+str(len(prev_scene.cluster_list)) + " clusters in prev scene")
+        rospy.loginfo("NaiveClusterTrackingStrategy")
+        rospy.loginfo(""+str(len(cur_scene.cluster_list)) + " clusters in cur scene")
+        rospy.loginfo(""+str(len(prev_scene.cluster_list)) + " clusters in prev scene")
 
         # set all clusters to be unassigned
         cur_scene.reset_cluster_assignments()
@@ -108,7 +107,7 @@ class NaiveClusterTrackingStrategy(ClusterTrackingStrategy):
                 idd = IndexDist(dist,cur_scene.cluster_list.index(cc),prev_scene.cluster_list.index(cp))
                 queue.put(idd)
 
-                #print("cur cluster: " + str(cc.cluster_id) + " prev cluster: " + str(cp.cluster_id) + " dist: " + str(dist))
+                #rospy.loginfo("cur cluster: " + str(cc.cluster_id) + " prev cluster: " + str(cp.cluster_id) + " dist: " + str(dist))
         while not queue.empty() and num_assigned < c_max:
             e = queue.get()
 
@@ -118,20 +117,20 @@ class NaiveClusterTrackingStrategy(ClusterTrackingStrategy):
                     # the centroid of the new cluster
                     # is outside the bbox of the last
                 #    if(cur_scene.cluster_list[e.index_one].bbox.contains_point(prev_scene.cluster_list[e.index_two].map_centroid)):
-                        if(self.talk): print("new cluster's centroid in prev cluster")
+                        rospy.loginfo("new cluster's centroid in prev cluster")
                         cur_scene.cluster_list[e.index_one].assigned = True
                         prev_scene.cluster_list[e.index_two].assigned = True
-                        if(self.talk): print("assigned cluster with index " + str(e.index_one) + " in cur frame, to cluster with index " + str(e.index_two) + " in prev frame, dist: " + str(e.dist))
+                        rospy.loginfo("assigned cluster with index " + str(e.index_one) + " in cur frame, to cluster with index " + str(e.index_two) + " in prev frame, dist: " + str(e.dist))
                         cur_scene.cluster_list[e.index_one].cluster_id = prev_scene.cluster_list[e.index_two].cluster_id
-                        if(self.talk): print("that cluster UUID is: " + str(cur_scene.cluster_list[e.index_one].cluster_id))
+                        rospy.loginfo("that cluster UUID is: " + str(cur_scene.cluster_list[e.index_one].cluster_id))
                         num_assigned+=1
                     #else:
-                    #    if(self.talk): print("old cluster doesn't contain new centroid, dist: " + str(e.dist))
-                    #    if(self.talk): print("cur centroid: " + str(cur_scene.cluster_list[e.index_one].map_centroid))
+                    #    rospy.loginfo("old cluster doesn't contain new centroid, dist: " + str(e.dist))
+                    #    rospy.loginfo("cur centroid: " + str(cur_scene.cluster_list[e.index_one].map_centroid))
                     #    bbox = prev_scene.cluster_list[e.index_two].bbox
-                    #    if(self.talk): print("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
+                    #    rospy.loginfo("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
 
-        if(self.talk): print("assigned: " + str(num_assigned) + " clusters ")
+        rospy.loginfo("assigned: " + str(num_assigned) + " clusters ")
 
 class IndexDist:
     def __init__(self,dist,one,two):

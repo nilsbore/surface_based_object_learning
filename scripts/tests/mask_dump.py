@@ -16,9 +16,7 @@ if __name__ == '__main__':
     print("getting soma service")
     rospy.wait_for_service('soma2/query_db')
     print("done")
-    print("setting up proxy")
     soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
-    print("done")
     print("making query")
 
     query = SOMA2QueryObjsRequest()
@@ -30,6 +28,7 @@ if __name__ == '__main__':
     if not response.objects:
         print("No SOMA objects!")
     else:
+        print("got " + str(len(response.objects)) + " SOMA objects")
         world_model = World(server_host='localhost',server_port=62345)
         for x in response.objects:
             print(x.id)

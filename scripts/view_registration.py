@@ -25,10 +25,10 @@ class ViewAlignmentManager:
 
     def __init__(self):
         #rospy.init_node('world_modeling_view_alignment', anonymous = True)
-        print("---created view alignment manager --")
-        print("waiting for view alignment service additional_view_registration_server from strands_3d_mapping")
+        rospy.loginfo("---created view alignment manager --")
+        rospy.loginfo("waiting for view alignment service additional_view_registration_server from strands_3d_mapping")
         self.reg_serv = rospy.ServiceProxy('additional_view_registration_server',AdditionalViewRegistrationService)
-        print("got it")
+        rospy.loginfo("got it")
 
 
     def transform_to_kdl(self,t):
@@ -77,20 +77,20 @@ class ViewAlignmentManager:
         return combined_cloud
 
     def set_frames(self,cloud):
-        print("VIEW REG RUNNING SET FRAMES")
+        rospy.loginfo("VIEW REG RUNNING SET FRAMES")
 
         # set some easy defaults
         self.root_camera_frame = "head_xtion_depth_optical_frame"
         self.child_camera_frame = "head_xtion_depth_frame"
-        print("camera input:" + str(cloud.header.frame_id))
+        rospy.loginfo("camera input:" + str(cloud.header.frame_id))
 
         if("head_xtion_rgb_optical_frame" in str(cloud.header.frame_id)):
             self.root_camera_frame = cloud.header.frame_id
             self.child_camera_frame = "head_xtion_rgb_frame"
 
-        print("frames are:")
-        print(self.root_camera_frame)
-        print(self.child_camera_frame)
+        rospy.loginfo("frames are:")
+        rospy.loginfo(self.root_camera_frame)
+        rospy.loginfo(self.child_camera_frame)
 
 
     def register_views(self,observations,merge_and_write=False):
@@ -103,8 +103,8 @@ class ViewAlignmentManager:
             t_st = TransformationStore().msg_to_transformer(tf_p)
 
             cam_cloud = o.get_message('object_cloud_camframe')
-            print("cam header: ")
-            print(cam_cloud.header)
+            rospy.loginfo("cam header: ")
+            rospy.loginfo(cam_cloud.header)
             obs_cloud = o.get_message('/head_xtion/depth_registered/points')
             self.set_frames(obs_cloud)
             c_time = t_st.getLatestCommonTime(self.child_camera_frame,self.root_camera_frame)
@@ -140,7 +140,7 @@ class ViewAlignmentManager:
             seg_clouds.append(cam_cloud)
             obs_clouds.append(obs_cloud)
 
-            print("looking for transform")
+            rospy.loginfo("looking for transform")
             c_time = t_st.getLatestCommonTime("map",self.child_camera_frame)
             trans,rot = t_st.lookupTransform("map",self.child_camera_frame,c_time)
 
@@ -154,22 +154,22 @@ class ViewAlignmentManager:
             cur_trans.rotation.z = rot[2]
             cur_trans.rotation.w = rot[3]
 
-            print(cur_trans)
+            rospy.loginfo(cur_trans)
             obs_transforms.append(cur_trans)
 
 
-        print("got: " + str(len(seg_clouds)) + " clouds for object")
+        rospy.loginfo("got: " + str(len(seg_clouds)) + " clouds for object")
 
-        print("running service call")
+        rospy.loginfo("running service call")
         response = self.reg_serv(additional_views=obs_clouds,additional_views_odometry_transforms=obs_transforms)
 
         view_trans = response.additional_view_transforms
-        print(view_trans)
+        rospy.loginfo(view_trans)
 
         cloud_id = 0
         #transformed_obs_clouds = []
         transformed_seg_clouds = []
-        print("-- aligning clouds -- ")
+        rospy.loginfo("-- aligning clouds -- ")
         for transform,seg_cloud in zip(view_trans,seg_clouds):
             rot = transform.rotation
             trs = transform.translation
@@ -187,7 +187,7 @@ class ViewAlignmentManager:
             merged_cloud = self.merge_pcs(transformed_seg_clouds)
 
     #    if(merge_and_write):
-        #    print("-- merging and writing clouds to files --")
+        #    rospy.loginfo("-- merging and writing clouds to files --")
         #    merged_cloud = self.merge_pcs(obs_clouds)
         #    python_pcd.write_pcd("merged_obs_non_aligned.pcd", merged_cloud)
 
@@ -199,21 +199,21 @@ class ViewAlignmentManager:
 
         #    python_pcd.write_pcd("merged_seg_aligned.pcd", merged_cloud)
 
-        print("success!")
+        rospy.loginfo("success!")
 
 
         return merged_cloud
 
 if __name__ == '__main__':
-    print("hi")
+    rospy.loginfo("hi")
     rospy.init_node('test2', anonymous = False)
     world_model = World(server_host='localhost',server_port=62345)
     obj = world_model.get_object("130c4040-50a2-4318-aa25-9b5a1c0b3810")
-    print("got object")
+    rospy.loginfo("got object")
 
-    print(obj._point_cloud)
+    rospy.loginfo(obj._point_cloud)
 
-    print("observations: " + str(len(obj._observations)))
+    rospy.loginfo("observations: " + str(len(obj._observations)))
     pub = rospy.Publisher('/world_modeling/align_and_merge_test', PointCloud2, queue_size=10)
 
     vr = ViewAlignmentManager()
