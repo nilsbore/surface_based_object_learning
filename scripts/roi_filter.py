@@ -31,7 +31,7 @@ class ROIFilter:
         rospy.wait_for_service('soma2/query_db')
         rospy.loginfo("done")
         rospy.loginfo("setting up proxy")
-        soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
+        self.soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
         rospy.loginfo("done")
         self.gather_rois()
 
@@ -39,7 +39,7 @@ class ROIFilter:
     def gather_rois(self):
         query = SOMA2QueryObjsRequest()
         query.query_type = 2
-        response = soma_query(query)
+        response = self.soma_query(query)
 
         self.soma_polygons = []
 
