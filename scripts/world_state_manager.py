@@ -511,10 +511,9 @@ class WorldStateManager:
                     rospy.loginfo("looking for recognition service")
                     recog_out = self.recog_service(cur_scene_cluster.segmented_pc_mapframe)
 
-                    # this should give us back #
                     labels = recog_out.ids
                     confidences = recog_out.confidence
-                    # this is all we care about #
+
                     cloud_observation.recognition = zip(labels,confidences)
                 except Exception, e:
                     rospy.logwarn("recog not online")
