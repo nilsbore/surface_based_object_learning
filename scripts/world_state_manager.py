@@ -103,6 +103,7 @@ class WorldStateManager:
             rospy.loginfo("getting recognition service")
             rospy.wait_for_service('/recognition_service/sv_recognition',20)
             self.recog_service = rospy.ServiceProxy('/recognition_service/sv_recognition',recognize)
+            rospy.loginfo("Got the recognition service!")
         except Exception,e:
             rospy.loginfo("Unable to get object recognition service, continuing but no object recognition will be performed")
             pass
@@ -508,17 +509,25 @@ class WorldStateManager:
                 # store the cropped rgb image for this cluster
             #    rospy.loginfo("result: ")
             #    rospy.loginfo(res)
+                confidences = None
+                labels = None
                 try:
                     rospy.loginfo("looking for recognition service")
                     recog_out = self.recog_service(cur_scene_cluster.segmented_pc_mapframe)
-
                     labels = recog_out.ids
                     confidences = recog_out.confidence
-
-                    cloud_observation.recognition = zip(labels,confidences)
                 except Exception, e:
-                    rospy.logwarn("Couldn't run recognition service not online")
-                    rospy.logwarn(e)
+                    rospy.logwarn("Couldn't run recognition service, or service not online")
+
+                try:
+                    rospy.loginfo("Trying to update world_model with output from recogniser")
+                    print("Confidences:")
+                    print(confidences)
+                    print("Labels: ")
+                    print(labels)
+                    cloud_observation.recognition = zip(labels,confidences)
+                except Exception,e:
+                    rospy.logwarn("Recognition successful, but unable to update world model with results")
 
                 cur_cluster.add_observation(cloud_observation)
 
