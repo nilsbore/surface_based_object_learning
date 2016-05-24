@@ -278,7 +278,7 @@ class WorldStateManager:
 
                     rospy.loginfo("---- Running Object Recognition ----")
                     rospy.loginfo("Header of cloud: ")
-                    rospy.loginfo(req.input)
+                    rospy.loginfo(req.input.header)
 
                     recog_out = self.recog_service(cloud=req.input)
 
