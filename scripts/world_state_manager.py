@@ -513,21 +513,26 @@ class WorldStateManager:
                 labels = None
                 try:
                     rospy.loginfo("looking for recognition service")
-                    recog_out = self.recog_service(cur_scene_cluster.segmented_pc_mapframe)
+
+                    recog_out = self.recog_service(cloud=cur_scene_cluster.segmented_pc_mapframe)
+
                     labels = recog_out.ids
+
                     confidences = recog_out.confidence
+
                 except Exception, e:
                     rospy.logwarn("Couldn't run recognition service, or service not online")
 
-                try:
-                    rospy.loginfo("Trying to update world_model with output from recogniser")
-                    print("Confidences:")
-                    print(confidences)
-                    print("Labels: ")
-                    print(labels)
-                    cloud_observation.recognition = zip(labels,confidences)
-                except Exception,e:
-                    rospy.logwarn("Recognition successful, but unable to update world model with results")
+                if(confidences not None):
+                    try:
+                        rospy.loginfo("Trying to update world_model with output from recogniser")
+                        print("Confidences:")
+                        print(confidences)
+                        print("Labels: ")
+                        print(labels)
+                        cloud_observation.recognition = zip(labels,confidences)
+                    except Exception,e:
+                        rospy.logwarn("Recognition successful, but unable to update world model with results")
 
                 cur_cluster.add_observation(cloud_observation)
 
