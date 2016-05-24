@@ -45,6 +45,17 @@ class WorldStateManager:
         rospy.init_node('world_state_modeling', anonymous = False)
         self.setup_clean = False
         if(talk): rospy.loginfo("Manager Online")
+
+        try:
+            rospy.loginfo("getting recognition service")
+            rospy.wait_for_service('/recognition_service/sv_recognition',3)
+            self.recog_service = rospy.ServiceProxy('/recognition_service/sv_recognition',recognize)
+        except Exception,e:
+            rospy.loginfo("Unable to get object recognition service, continuing but no object recognition will be performed")
+            pass
+
+
+
         # make a cluster tracker
         rospy.loginfo("looking for camera info topic")
         self.camera_info_topic = self.get_camera_info_topic_as_string()
@@ -99,13 +110,6 @@ class WorldStateManager:
         rospy.loginfo("done")
         self.soma_update = rospy.ServiceProxy('soma2/update_object',SOMA2UpdateObject)
 
-        try:
-            rospy.loginfo("getting recognition service")
-            rospy.wait_for_service('/recognition_service/sv_recognition',3)
-            self.recog_service = rospy.ServiceProxy('/recognition_service/sv_recognition',recognize)
-        except Exception,e:
-            rospy.loginfo("Unable to get object recognition service, continuing but no object recognition will be performed")
-            pass
 
 
         rospy.loginfo("setting up view alignment manager")
