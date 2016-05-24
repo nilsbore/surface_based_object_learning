@@ -520,8 +520,6 @@ class WorldStateManager:
 
                 except Exception, e:
                     rospy.logwarn("Couldn't run recognition service, or service not online")
-                    rospy.logwarn("ERROR FROM RECOGNISER:")
-                    rospy.logwarn(e)
 
                 if(confidences not None):
                     try:
