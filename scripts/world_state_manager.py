@@ -273,13 +273,9 @@ class WorldStateManager:
                     self.assign_clusters(scene,self.cluster_tracker.prev_scene)
                     self.pending_obs.append(scene)
                     rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
-                    return WorldUpdateResponse(True,self.cur_view_soma_ids)
-                else:
-                    rospy.loginfo("Error in processing scene")
 
-                rospy.loginfo("---- Running Object Recognition ----")
+                    rospy.loginfo("---- Running Object Recognition ----")
 
-                try:
                     recog_out = self.recog_service(cloud=req.input)
 
                     rospy.loginfo("---- Printing Results of Object Recognition ----")
@@ -295,8 +291,10 @@ class WorldStateManager:
 
 
                     rospy.sleep(10)
-                except Exception,e:
-                    rospy.loginfo("Unable to run Object Recognition")
+
+                    return WorldUpdateResponse(True,self.cur_view_soma_ids)
+                else:
+                    rospy.loginfo("Error in processing scene")
 
 
 
