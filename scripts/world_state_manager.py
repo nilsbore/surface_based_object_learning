@@ -276,6 +276,31 @@ class WorldStateManager:
                     return WorldUpdateResponse(True,self.cur_view_soma_ids)
                 else:
                     rospy.loginfo("Error in processing scene")
+
+                rospy.loginfo("---- Running Object Recognition ----")
+
+                try:
+                    recog_out = self.recog_service(cloud=req.input)
+
+                    rospy.loginfo("---- Printing Results of Object Recognition ----")
+
+                    labels = recog_out.ids
+                    confidences = recog_out.confidence
+
+                    print("LABELS: ")
+                    print(labels)
+
+                    print("CONFIDENCES: ")
+                    print(confidences)
+
+
+                    rospy.sleep(10)
+                except Exception,e:
+                    rospy.loginfo("Unable to run Object Recognition")
+
+
+
+
             except Exception,e:
                 rospy.logerr("Unable to segment and proces this scene")
                 rospy.logerr(e)
@@ -509,28 +534,28 @@ class WorldStateManager:
                 # store the cropped rgb image for this cluster
             #    rospy.loginfo("result: ")
             #    rospy.loginfo(res)
-                confidences = None
-                labels = None
-                try:
-                    rospy.loginfo("looking for recognition service")
+                #confidences = None
+                #labels = None
+                #try:
+                #    rospy.loginfo("looking for recognition service")
 
-                    recog_out = self.recog_service(cloud=cur_scene_cluster.segmented_pc_mapframe)
-                    labels = recog_out.ids
-                    confidences = recog_out.confidence
+                #    recog_out = self.recog_service(cloud=cur_scene_cluster.segmented_pc_mapframe)
+                #    labels = recog_out.ids
+                #    confidences = recog_out.confidence
 
-                except Exception, e:
-                    rospy.logwarn("Couldn't run recognition service, or service not online")
+                #except Exception, e:
+                #    rospy.logwarn("Couldn't run recognition service, or service not online")
 
-                if(confidences not None):
-                    try:
-                        rospy.loginfo("Trying to update world_model with output from recogniser")
-                        print("Confidences:")
-                        print(confidences)
-                        print("Labels: ")
-                        print(labels)
-                        cloud_observation.recognition = zip(labels,confidences)
-                    except Exception,e:
-                        rospy.logwarn("Recognition successful, but unable to update world model with results")
+                #if(confidences not None):
+                #    try:
+                    #    rospy.loginfo("Trying to update world_model with output from recogniser")
+                    #    print("Confidences:")
+                    #    print(confidences)
+                    #    print("Labels: ")
+                    #    print(labels)
+                    #    cloud_observation.recognition = zip(labels,confidences)
+                    #except Exception,e:
+                    #    rospy.logwarn("Recognition successful, but unable to update world model with results")
 
                 cur_cluster.add_observation(cloud_observation)
 
