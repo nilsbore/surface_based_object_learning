@@ -101,7 +101,7 @@ class WorldStateManager:
 
         try:
             rospy.loginfo("getting recognition service")
-            rospy.wait_for_service('/recognition_service/sv_recognition',3)
+            rospy.wait_for_service('/recognition_service/sv_recognition',20)
             self.recog_service = rospy.ServiceProxy('/recognition_service/sv_recognition',recognize)
         except Exception,e:
             rospy.loginfo("Unable to get object recognition service, continuing but no object recognition will be performed")
@@ -411,6 +411,7 @@ class WorldStateManager:
 
         response = self.soma_get(query)
 
+
         return response
 
     def assign_clusters(self,scene,prev_scene):
@@ -516,7 +517,8 @@ class WorldStateManager:
 
                     cloud_observation.recognition = zip(labels,confidences)
                 except Exception, e:
-                    rospy.logwarn("recog not online")
+                    rospy.logwarn("Couldn't run recognition service not online")
+                    rospy.logwarn(e)
 
                 cur_cluster.add_observation(cloud_observation)
 

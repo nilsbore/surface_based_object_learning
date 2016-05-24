@@ -44,6 +44,11 @@ class ROIFilter:
         self.soma_polygons = []
 
         for roi in response.rois:
+            if("RobotNavArea" in roi.type):
+                continue
+            if("HumanWorkplace" in roi.type):
+                continue
+
             points = roi.posearray.poses
             points_2d = []
 
