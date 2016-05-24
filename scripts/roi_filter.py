@@ -48,6 +48,9 @@ class ROIFilter:
             points_2d = []
             for point in points:
                 points_2d.append([point.position.x,point.position.y])
+            if(len(points_2d) < 2):
+                print("Found one SOMA region that isn't a polygon (doesn't have >= 3 points) so I am skipping it")
+                continue
             polygon = Polygon(points_2d)
             self.soma_polygons.append(polygon)
 

@@ -109,7 +109,7 @@ class WorldStateManager:
             else:
                 rospy.loginfo("no recognition service")
         except Exception,e:
-            rospy.logerr("Unable to get object recognition service, continuing but no object recognition will be performed")
+            rospy.loginfo("Unable to get object recognition service, continuing but no object recognition will be performed")
 
         rospy.loginfo("setting up view alignment manager")
         self.view_alignment_manager = ViewAlignmentManager()
