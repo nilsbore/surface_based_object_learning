@@ -303,8 +303,6 @@ class WorldStateManager:
                     rospy.loginfo("Error in processing scene")
 
 
-
-
             except Exception,e:
                 rospy.logerr("Unable to segment and proces this scene")
                 rospy.logerr(e)
