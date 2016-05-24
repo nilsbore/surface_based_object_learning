@@ -289,7 +289,6 @@ class WorldStateManager:
                     print("CONFIDENCES: ")
                     print(confidences)
 
-
                     rospy.sleep(10)
 
                     return WorldUpdateResponse(True,self.cur_view_soma_ids)
