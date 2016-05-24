@@ -515,9 +515,7 @@ class WorldStateManager:
                     rospy.loginfo("looking for recognition service")
 
                     recog_out = self.recog_service(cloud=cur_scene_cluster.segmented_pc_mapframe)
-
                     labels = recog_out.ids
-
                     confidences = recog_out.confidence
 
                 except Exception, e:
