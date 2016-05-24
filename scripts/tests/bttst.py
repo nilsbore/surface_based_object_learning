@@ -1,6 +1,8 @@
 import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField
+# recog stuff
+from recognition_srv_definitions.srv import *
 
 
 def cb(data):
@@ -18,14 +20,16 @@ if __name__ == '__main__':
 
     cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
 
+
     try:
         rospy.loginfo("looking for recognition service")
         recog_out = self.recog_service(cloud=cur_scene_cluster.segmented_pc_mapframe)
-        labels = recog_out.ids
-        confidences = recog_out.confidence
+        #labels = recog_out.ids
+        #confidences = recog_out.confidence
 
         print(labels)
         print(confidences)
 
     except Exception, e:
         rospy.logwarn("Couldn't run recognition service, or service not online")
+        rospy.logwarn(e)
