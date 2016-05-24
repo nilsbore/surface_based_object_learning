@@ -35,6 +35,7 @@ from bayes_people_tracker.msg import PeopleTracker
 from vision_people_logging.msg import LoggingUBD
 from human_trajectory.msg import Trajectories
 
+import uuid
 
 talk = True
 
@@ -81,8 +82,6 @@ class WorldStateManager:
 
         begin_observations = rospy.Service('/begin_observations',Trigger,self.begin_obs)
         end_observations = rospy.Service('/end_observations',Trigger,self.end_obs)
-
-
 
         rospy.loginfo("setting up SOMA services")
         rospy.loginfo("getting SOMA insert service")
@@ -138,6 +137,7 @@ class WorldStateManager:
         self.cur_sequence_obj_ids = []
         self.cur_view_soma_ids = []
         self.cluster_tracker.reset()
+        self.view_episode_id = str(uuid.uuid4())
 
         try:
             # TODO: have to hack this due to issue with world_model code I'd rather not touch for now
@@ -338,7 +338,39 @@ class WorldStateManager:
                 rospy.loginfo("ignoring")
                 rospy.loginfo("successfully updated object")
 
+        self.do_object_recognition()
         rospy.loginfo("post-processing complete")
+
+    def do_object_recognition(self):
+        print("running batch object recog")
+        for object_id in self.cur_sequence_obj_ids:
+            soma_objects = self.get_soma_objects_with_id(object_id)
+            soma_object = soma_objects.objects[0]
+
+            if(not soma_object):
+                rospy.loginfo("SOMA object doesn't exist")
+                continue
+            else:
+                rospy.loginfo("got this SOMA object")
+
+            if(not self.world_model.does_object_exist(object_id)):
+                rospy.logerr("WORLD object doesn't exist")
+                continue
+            try:
+                world_object = self.world_model.get_object(object_id)
+            except rospy.ServiceException, e:
+                rospy.logerr("DB ERROR")
+                continue
+
+            # send the point cloud of the SOMA object to object recognition #
+
+            # get back the results #
+
+            # update the world_model object and its class distributions #
+
+            # do something else? #
+
+
 
     def cluster_is_live(self,cluster_id,waypoint):
         if(talk): rospy.loginfo("seeing if object exists:" + str(cluster_id) +" in: " + waypoint)
@@ -465,7 +497,9 @@ class WorldStateManager:
                     collection=message_proxy.collection,
                     obj_id=msg_id,
                     typ=cur_scene_cluster.segmented_pc_mapframe._type)
+
                 cur_cluster._point_cloud = mso
+                cur_cluster.view_episode_id = self.view_episode_id
 
                 #cloud_observation.add_message(cur_scene_cluster.img_bbox,"image_bounding_box")
                 #cloud_observation.add_message(cur_scene_cluster.img_centroid,"image_centroid")
@@ -501,9 +535,6 @@ class WorldStateManager:
                 #success = cv2.imwrite(cid+"/"+fid+'.jpeg',cur_scene_cluster.cv_image_cropped)
                 #rospy.loginfo("SUCCESS WITH TEST WRITE: ")
                 #rospy.loginfo(success)
-
-
-
 
                 if(soma_objs.objects):
                     rospy.loginfo("soma has this object")

@@ -25,6 +25,7 @@ import image_geometry
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
 import base64
+from roi_filter import ROIFilter
 
 
 class BBox():
@@ -111,6 +112,7 @@ class SegmentedCluster:
         self.local_centroid = None
         self.bbox = None
         self.assigned = False
+
 
     def reset_assignment(self):
         self.assigned = False
@@ -315,7 +317,7 @@ class SegmentedScene:
         rospy.loginfo(self.child_camera_frame)
 
 
-    def __init__(self,indices,input_scene_cloud,pub):
+    def __init__(self,indices,input_scene_cloud,roi_filter):
         self.set_frames(input_scene_cloud)
         self.clean_setup = False
         #rospy.loginfo("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
@@ -365,6 +367,9 @@ class SegmentedScene:
         map_points_int_data = list(map_points)
 
         # rospy.loginfo("loading clusters")
+        rospy.loginfo("Located: %d candidate clusters", len(indices.clusters_indices))
+        rospy.loginfo("ROI Filtering is ON")
+
         for root_cluster in indices.clusters_indices:
             map_points_data = []
             rgb_mask = np.zeros(cv_image.shape,np.uint8)
@@ -528,6 +533,14 @@ class SegmentedScene:
             ps_t.point.z = z
 
             cur_cluster.map_centroid = np.array((ps_t.point.x ,ps_t.point.y, ps_t.point.z))
+
+            # filter based on SOMA ROI info #
+            if(roi_filter.point_in_roi([ps_t.point.x,ps_t.point.y])):
+                rospy.logwarn("This object is within a SOMA ROI, continuing processing")
+            else:
+                rospy.logwarn("This object is NOT within a SOMA ROI, not processing")
+                continue
+
             cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
 
 
@@ -542,7 +555,6 @@ class SegmentedScene:
             header_map.stamp = rospy.Time.now()
             header_map.frame_id = 'map'
             cur_cluster.segmented_pc_mapframe = pc2.create_cloud(header_map, to_map.fields, map_points_data)
-            pub.publish(to_map)
 
 
             #rospy.loginfo("centroid:")
@@ -649,7 +661,7 @@ class SOMAClusterTracker:
         self.cur_scene = None
         self.prev_scene = None
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
-        self.pub = rospy.Publisher('/world_modeling/cluster_tracker_intermediate', PointCloud2, queue_size=10)
+        self.roi_filter = ROIFilter()
 
     def reset(self):
         self.cur_scene = None
@@ -667,7 +679,7 @@ class SOMAClusterTracker:
         try:
             out = self.segmentation.seg_service(cloud=data)
 
-            new_scene = SegmentedScene(out,data,self.pub)
+            new_scene = SegmentedScene(out,data,self.roi_filter)
 
             rospy.loginfo("new scene added, with " + str(new_scene.num_clusters) + " clusters")
             self.cur_scene = new_scene
