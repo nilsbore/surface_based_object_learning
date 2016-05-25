@@ -291,11 +291,17 @@ class WorldStateManager:
                     print(labels)
 
                     print("CONFIDENCES: ")
+
+
                     print(confidences)
 
+
+
                     fn = str(uuid.uuid4())
+
                     print("WRITING SCENE TO FILE: " + fn)
-                    python_pcd.write_pcd("fn+".pcd", req.input)
+
+                    python_pcd.write_pcd("  fn+".pcd", req.input)
 
                     rospy.sleep(15)
                     return WorldUpdateResponse(True,self.cur_view_soma_ids)
