@@ -277,8 +277,8 @@ class WorldStateManager:
                     rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
 
                     rospy.loginfo("---- Running Object Recognition ----")
-                    rospy.loginfo("Header of cloud: ")
-                    rospy.loginfo(req.input.header)
+                    #rospy.loginfo("Header of cloud: ")
+                    #rospy.loginfo(req.input.header)
 
                     recog_out = self.recog_service(cloud=req.input)
 
@@ -295,7 +295,7 @@ class WorldStateManager:
 
                     fn = str(uuid.uuid4())
                     print("WRITING SCENE TO FILE: " + fn)
-                    python_pcd.write_pcd(fn+".pcd", req.input)
+                    python_pcd.write_pcd("fn+".pcd", req.input)
 
                     rospy.sleep(15)
                     return WorldUpdateResponse(True,self.cur_view_soma_ids)
