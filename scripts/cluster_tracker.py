@@ -31,21 +31,6 @@ from roi_filter import ROIFilter
 class BBox():
     """ Bounding box of an object with getter functions.
     """
-    def __init__(self, bbox):
-        # Calc x_min and x_max for obj1
-        x_sorted = sorted(bbox, key=itemgetter(0))
-        self.x_min = x_sorted[0][0]
-        self.x_max = x_sorted[7][0]
-
-        # Calc y_min and y_max for obj
-        y_sorted = sorted(bbox, key=itemgetter(1))
-        self.y_min = y_sorted[0][1]
-        self.y_max = y_sorted[7][1]
-
-        # Calc z_min and z_max for obj
-        z_sorted = sorted(bbox, key=itemgetter(2))
-        self.z_min = z_sorted[0][2]
-        self.z_max = z_sorted[7][2]
 
     def __init__(self, x_min, x_max, y_min, y_max, z_min, z_max):
         self.x_min = x_min
@@ -56,25 +41,6 @@ class BBox():
 
         self.z_min = z_min
         self.z_max = z_max
-
-    def get_x_min(self):
-        return self.x_min
-
-    def get_x_max(self):
-        return self.x_max
-
-
-    def get_y_min(self):
-        return self.y_min
-
-    def get_y_max(self):
-        return self.y_max
-
-    def get_z_min(self):
-        return self.z_min
-
-    def get_z_max(self):
-        return self.z_max
 
     def contains_point(self,point):
         if (self.x_max >= point[0] and self.x_min <= point[0] and self.y_max >= point[1] and self.y_min <= point[1] and self.z_max >= point[2] and self.z_min <= point[2]):
@@ -291,8 +257,21 @@ class SegmentedScene:
         if not(x - 1 < 0):
             points.append([y,x-1])
 
-        if not(y + 1 > 640):
+        if not(x + 1 > 640):
             points.append([y,x+1])
+
+        if not(y - 1 < 0) and not(x - 1 < 0):
+            points.append([y-1,x-1])
+
+        if not(y + 1 > 480) and not(x - 1 < 0):
+            points.append([y+1,x-1])
+
+        if not(y - 1 < 0) and not(x + 1 > 0):
+            points.append([y-1,x+1])
+
+        if not(y + 1 > 480) and not(x + 1 < 0):
+            points.append([y+1,x+1])
+
 
         return points
 
@@ -311,6 +290,11 @@ class SegmentedScene:
             rospy.loginfo("found head_xtion_depth_optical_frame")
             self.root_camera_frame = cloud.header.frame_id
             self.child_camera_frame = "head_xtion_depth_frame"
+
+        # fixes issue when loading files from chris' pcd loader
+        if(cloud.header.frame_id in "/pcd_cloud"):
+            self.root_camera_frame = "/head_xtion_depth_optical_frame"
+            self.child_camera_frame = "/head_xtion_depth_frame"
 
         rospy.loginfo("frames are:")
         rospy.loginfo(self.root_camera_frame)
@@ -511,8 +495,8 @@ class SegmentedScene:
                     max_z = pt_s.point.z
 
             #rospy.loginfo("RGB bbox: [" + str(rgb_min_x) + "," + str(rgb_min_y) + "," +str(rgb_max_x) + "," + str(rgb_max_y) + "]")
-            #rospy.loginfo("3d bbox (map): [" + str(min_x) + "," + str(min_y) + "," +str(min_z) + "," + str(max_x) + "," + str(max_y) + ","+str(max_z)+"]")
-            #rospy.loginfo("3d bbox (local): [" + str(local_min_x) + "," + str(local_min_y) + "," +str(local_min_z) + "," + str(local_max_x) + "," + str(local_max_y) + ","+str(local_max_z)+"]")
+            rospy.loginfo("3d bbox (map): [" + str(min_x) + "," + str(min_y) + "," +str(min_z) + "," + str(max_x) + "," + str(max_y) + ","+str(max_z)+"]")
+            rospy.loginfo("3d bbox (local): [" + str(local_min_x) + "," + str(local_min_y) + "," +str(local_min_z) + "," + str(local_max_x) + "," + str(local_max_y) + ","+str(local_max_z)+"]")
 
             x /= len(cur_cluster.data)
             y /= len(cur_cluster.data)
@@ -560,7 +544,7 @@ class SegmentedScene:
 
             #rospy.loginfo("centroid:")
             # TODO: MAP CENTROID DOESN'T WORK ANY MORE
-            #rospy.loginfo("map centroid:" + str(cur_cluster.map_centroid))
+            rospy.loginfo("map centroid:" + str(cur_cluster.map_centroid))
             #rospy.loginfo("local centroid:" + str(cur_cluster.local_centroid))
 
 
@@ -630,6 +614,7 @@ class SegmentedScene:
             #rospy.loginfo("img bbox: " + str(cur_cluster.img_bbox))
 
             bbox = BBox(min_x,max_x,min_y,max_y,min_z,max_z)
+            bbox_local = BBox(local_min_x,local_max_x,local_min_y,local_max_y,local_min_z,local_max_z)
 
             x_range = max_x-min_x
             y_range = max_y-min_y
@@ -643,6 +628,7 @@ class SegmentedScene:
             outer_core_bbox = BBox(min_x+x_mod,max_x-x_mod,min_y+y_mod,max_y-y_mod,min_z+z_mod,max_z-z_mod)
 
             cur_cluster.bbox = bbox
+            cur_cluster.bbox_local = bbox_local
             cur_cluster.outer_core_bbox = outer_core_bbox
 
             # rospy.loginfo("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
