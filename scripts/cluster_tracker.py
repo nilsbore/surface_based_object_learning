@@ -535,11 +535,12 @@ class SegmentedScene:
             cur_cluster.map_centroid = np.array((ps_t.point.x ,ps_t.point.y, ps_t.point.z))
 
             # filter based on SOMA ROI info #
-            if(roi_filter.point_in_roi([ps_t.point.x,ps_t.point.y])):
-                rospy.logwarn("This object is within a SOMA ROI, continuing processing")
-            else:
-                rospy.logwarn("This object is NOT within a SOMA ROI, not processing")
-                continue
+            if(roi_filter):
+                if(roi_filter.point_in_roi([ps_t.point.x,ps_t.point.y])):
+                    rospy.logwarn("This object is within a SOMA ROI, continuing processing")
+                else:
+                    rospy.logwarn("This object is NOT within a SOMA ROI, not processing")
+                    continue
 
             cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
 
@@ -661,7 +662,7 @@ class SOMAClusterTracker:
         self.cur_scene = None
         self.prev_scene = None
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
-        self.roi_filter = ROIFilter()
+        self.roi_filter = None
 
     def reset(self):
         self.cur_scene = None
