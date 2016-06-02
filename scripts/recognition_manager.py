@@ -90,6 +90,10 @@ class ObjectRecognitionManager:
         # get the map bbox of cluster
         bbox = cluster.bbox_local
         rospy.loginfo("-- Getting most likely label for cluster --")
+        if(cluster.label):
+            rospy.loginfo("-- Cluster already has a label--")
+        else:
+            rospy.loginfo("-- Cluster is as yet unlabelled --")
 
         # test against all the poits in all the result objects
 
@@ -109,13 +113,23 @@ class ObjectRecognitionManager:
             scores[(result,cluster)].score = (float)(scores[(result,cluster)].score/total)
 
         # find the one that matches the best
-        rospy.loginfo("LABEL \t \t \t CONFIDENCE")
+
         s_max = -1
         best = ClusterScore(uk,cluster,0)
+
+        if(cluster.label):
+            best = cluster.label
+            rospy.loginfo("setting best to existing label: " + best.one.label + " at confidence: " + str(best.one.confidence))
+
+        rospy.loginfo("LABEL \t \t \t MATCH SCORE")
         for s in scores:
             rospy.loginfo(str(scores[s].one.label) + " \t \t \t " + str(scores[s].score))
+            
+            if(scores[s].one.confidence < best.one.confidence):
+                continue
+
             if(scores[s].score > s_max):
-                best = s
+                best = scores[s]
                 s_max = scores[s].score
 
         return best
@@ -124,8 +138,7 @@ class ObjectRecognitionManager:
     def assign_labels(self,scene):
         for cluster in scene.cluster_list:
             rospy.loginfo("Processing Cluster " + cluster.cluster_id)
-            best_label = self.get_most_likely_label(cluster)
-            cluster.label = best_label
+            cluster.label = self.get_most_likely_label(cluster)
 
     def recognise_scene(self,input_cloud):
         rospy.loginfo("--- running object recognition ---")
@@ -179,6 +192,7 @@ if __name__ == '__main__':
     cluster_tracker.add_unsegmented_scene(testcl)
 
 
+    r.assign_labels(cluster_tracker.cur_scene)
     r.assign_labels(cluster_tracker.cur_scene)
 
 

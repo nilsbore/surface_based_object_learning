@@ -78,6 +78,7 @@ class SegmentedCluster:
         self.local_centroid = None
         self.bbox = None
         self.assigned = False
+        self.label = None
 
 
     def reset_assignment(self):
