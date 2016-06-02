@@ -86,13 +86,16 @@ class ObjectRecognitionManager:
         self.rec_service = rospy.ServiceProxy("/recognition_service/sv_recognition", recognize)
 
 
-    def get_most_likely(self,cluster):
+    def get_most_likely_label(self,cluster):
         # get the map bbox of cluster
         bbox = cluster.bbox_local
         rospy.loginfo("-- Getting most likely label for cluster --")
 
         # test against all the poits in all the result objects
+
+        uk = RecognitionResult("unknown",0.0,None)
         scores = {}
+        scores[(uk,cluster)] = ClusterScore(uk,cluster,0)
         for result in self.recog_results:
             cloud = result.cloud
             scores[(result,cluster)] = ClusterScore(result,cluster,0)
@@ -108,7 +111,7 @@ class ObjectRecognitionManager:
         # find the one that matches the best
         rospy.loginfo("LABEL \t \t \t CONFIDENCE")
         s_max = -1
-        best = None
+        best = ClusterScore(uk,cluster,0)
         for s in scores:
             rospy.loginfo(str(scores[s].one.label) + " \t \t \t " + str(scores[s].score))
             if(scores[s].score > s_max):
@@ -118,6 +121,11 @@ class ObjectRecognitionManager:
         return best
 
 
+    def assign_labels(self,scene):
+        for cluster in scene.cluster_list:
+            rospy.loginfo("Processing Cluster " + cluster.cluster_id)
+            best_label = self.get_most_likely_label(cluster)
+            cluster.label = best_label
 
     def recognise_scene(self,input_cloud):
         rospy.loginfo("--- running object recognition ---")
@@ -171,8 +179,7 @@ if __name__ == '__main__':
     cluster_tracker.add_unsegmented_scene(testcl)
 
 
-    for cluster in cluster_tracker.cur_scene.cluster_list:
-        r.get_most_likely(cluster)
+    r.assign_labels(cluster_tracker.cur_scene)
 
 
 #    x = 0

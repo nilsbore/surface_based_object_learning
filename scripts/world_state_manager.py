@@ -12,6 +12,7 @@ import cv2
 # ROS stuff
 from sensor_msgs.msg import PointCloud2, PointField
 from cluster_tracker import SOMAClusterTracker
+from recognition_manager import ObjectRecognitionManager
 from view_registration import ViewAlignmentManager
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo, JointState
 from std_srvs.srv import Trigger, TriggerResponse
@@ -101,14 +102,15 @@ class WorldStateManager:
         rospy.loginfo("done")
         self.soma_update = rospy.ServiceProxy('soma2/update_object',SOMA2UpdateObject)
 
-        try:
-            rospy.loginfo("getting recognition service")
-            rospy.wait_for_service('/recognition_service/sv_recognition',20)
-            self.recog_service = rospy.ServiceProxy('/recognition_service/sv_recognition',recognize)
-            rospy.loginfo("Got the recognition service!")
-        except Exception,e:
-            rospy.loginfo("Unable to get object recognition service, continuing but no object recognition will be performed")
-            pass
+        #try:
+    #        rospy.loginfo("getting recognition service")
+        #    rospy.wait_for_service('/recognition_service/sv_recognition',20)
+        #    self.recog_service = rospy.ServiceProxy('/recognition_service/sv_recognition',recognize)
+        #    rospy.loginfo("Got the recognition service!")
+        #except Exception,e:
+        #    rospy.loginfo("Unable to get object recognition service, continuing but no object recognition will be performed")
+        #    pass
+        self.recog_manager = ObjectRecognitionManager()
 
 
         rospy.loginfo("setting up view alignment manager")
@@ -277,31 +279,34 @@ class WorldStateManager:
                     rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
 
                     rospy.loginfo("---- Running Object Recognition ----")
+                    self.recog_manager.recognise_scene(req.input)
+                    self.recog_manager.assign_labels(scene)
+
                     #rospy.loginfo("Header of cloud: ")
                     #rospy.loginfo(req.input.header)
 
-                    recog_out = self.recog_service(cloud=req.input)
+                #    recog_out = self.recog_service(cloud=req.input)
 
-                    rospy.loginfo("---- Printing Results of Object Recognition ----")
+                #    rospy.loginfo("---- Printing Results of Object Recognition ----")
 
-                    labels = recog_out.ids
-                    confidences = recog_out.confidence
+                #    labels = recog_out.ids
+                #    confidences = recog_out.confidence
 
-                    print("LABELS: ")
-                    print(labels)
+                #    print("LABELS: ")
+                #    print(labels)
 
-                    print("CONFIDENCES: ")
-
-
-                    print(confidences)
+                #    print("CONFIDENCES: ")
 
 
+                #    print(confidences)
 
-                    fn = str(uuid.uuid4())
 
-                    print("WRITING SCENE TO FILE: " + fn)
 
-                    python_pcd.write_pcd("  fn+".pcd", req.input)
+                #    fn = str(uuid.uuid4())
+
+                #    print("WRITING SCENE TO FILE: " + fn)
+
+                #    python_pcd.write_pcd("  fn+".pcd", req.input)
 
                     rospy.sleep(15)
                     return WorldUpdateResponse(True,self.cur_view_soma_ids)
