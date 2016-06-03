@@ -93,6 +93,35 @@ class ViewAlignmentManager:
         rospy.loginfo(self.root_camera_frame)
         rospy.loginfo(self.child_camera_frame)
 
+    def register_scenes(self,cur_scene,prev_scene,root_scene):
+        # transform these scenes to the camera frames
+        cam_cur = self.transform_cloud(cur_scene.data,cur_scene.transform_camera_to_frame.translation,cur_scene.transform_camera_to_frame.rotation)
+        cam_prev = self.transform_cloud(prev_scene.data,prev_scene.transform_camera_to_frame.translation,prev_scene.transform_camera_to_frame.rotation)
+        cam_root = self.transform_cloud(root_scene.data,root_scene.transform_camera_to_frame.translation,root_scene.transform_camera_to_frame.rotation)
+        scenes = [cam_root,cam_prev,cam_cur]
+
+        map_root_t = root_scene.transform_frame_to_map
+        map_cur_t = cur_scene.transform_frame_to_map
+        map_prev_t = prev_scene.transform_frame_to_map
+
+        # align these clouds
+        response = self.reg_serv(additional_views=clusters,additional_views_odometry_transforms=[map_root_t,map_prev_t,map_cur_t])
+        view_trans = response.additional_view_transforms
+        transformed_clusters = {}
+
+        for ts,scene in zip(view_trans,scenes):
+            rot = ts.rotation
+            tls = ts.translation
+            # make new clouds out of the segmented clouds in this scene
+            transformed_clusters[scene.scene_id] = []
+            for cluster in scene.cluster_list:
+                # transform data using above transforms, first to cam frame
+                cc = self.transform_cloud(cluster.data,scene.transform_camera_to_frame.translation,scene.transform_camera_to_frame.rotation)
+                # then to aligned map
+                cm = self.transform_cloud(cc,tls,rot)
+                transformed_clusters[scene.scene_id].append(cm)
+
+        return transformed_clusters
 
     def register_views(self,observations,merge_and_write=False):
         seg_clouds = []

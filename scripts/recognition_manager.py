@@ -71,11 +71,11 @@ class ObjectRecognitionManager:
 
 
     def __init__(self):
-        #rospy.init_node('recog_manager', anonymous = True)
-        rospy.loginfo("--- created recognition manager ---")
-        rospy.loginfo("-- Waiting for Recognition Service --")
+        rospy.loginfo("-- Waiting for Object Recognition Service --")
+        self.setup_clean = False
         try:
             rospy.wait_for_service("/recognition_service/sv_recognition",10)
+            self.setup_clean = True
         except Exception,e:
             rospy.logwarn("Could not get singleview recognition service, recognition will not be performed")
 
@@ -88,6 +88,10 @@ class ObjectRecognitionManager:
 
     def get_most_likely_label(self,cluster):
         # get the map bbox of cluster
+        if(self.setup_clean is False):
+            rospy.logwarn("*** World_state_manager does not have recognition service")
+            return
+
         bbox = cluster.bbox_local
         rospy.loginfo("-- Getting most likely label for cluster --")
         if(cluster.label):
@@ -124,7 +128,7 @@ class ObjectRecognitionManager:
         rospy.loginfo("LABEL \t \t \t MATCH SCORE")
         for s in scores:
             rospy.loginfo(str(scores[s].one.label) + " \t \t \t " + str(scores[s].score))
-            
+
             if(scores[s].one.confidence < best.one.confidence):
                 continue
 
@@ -141,32 +145,36 @@ class ObjectRecognitionManager:
             cluster.label = self.get_most_likely_label(cluster)
 
     def recognise_scene(self,input_cloud):
+        if(self.setup_clean is False):
+            rospy.logwarn("*** World_state_manager does not have recognition service")
+            return
         rospy.loginfo("--- running object recognition ---")
         # run recogniser on input cloud
         self.frame = input_cloud.header.frame_id
 
         if(self.frame in "/pcd_cloud"):
             self.frame = "/head_xtion_depth_frame"
+
         rospy.loginfo("Input frame id: " + self.frame)
 
         tr_r = []
 
-        try:
-            rospy.loginfo("Looking for transform to map coordinates")
-            t = self.listener.getLatestCommonTime("map", self.frame)
-            self.listener.waitForTransform("map", self.frame, t, rospy.Duration(5.0))
-            tr_r = self.listener.lookupTransform("map", self.frame, t)
-
-
+        #try:
+        #    rospy.loginfo("Looking for transform to map coordinates")
+            #t = self.listener.getLatestCommonTime("map", self.frame)
+            #self.listener.waitForTransform("map", self.frame, t, rospy.Duration(5.0))
+            #tr_r = self.listener.lookupTransform("map", self.frame, t)
             #tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
             #tr.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
-        except Exception,e:
-            rospy.logwarn("Failed to get transform to map co-ordinates")
+        #except Exception,e:
+        #    rospy.logwarn("Failed to get transform to map co-ordinates")
+        #rospy.loginfo("Got transform successfully")
 
-        rospy.loginfo("Got transform successfully")
         rospy.loginfo("Running Recognition")
-
-        response = self.rec_service(cloud=input_cloud)
+        try:
+            response = self.rec_service(cloud=input_cloud)
+        except Exception,e:
+            rospy.logwarn("Recognition failed")
 
         self.recog_results = []
 

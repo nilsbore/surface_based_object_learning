@@ -12,12 +12,12 @@ class ClusterTrackingStrategy:
         rospy.loginfo("-- Using tracking strategy: ")
 
 
-    def track(self,cur_scene,prev_scene):
+    def track(self,cur_scene,prev_scene,root_scene):
         rospy.loginfo("-- Performing Tracking")
 
 
 class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
-    def track(self,cur_scene,prev_scene):
+    def track(self,cur_scene,prev_scene,root_scene,view_alignment_manager):
         rospy.loginfo("VotingBasedClusterTrackingStrategy")
         rospy.loginfo(""+str(len(cur_scene.cluster_list)) + " clusters in this scene")
         rospy.loginfo(""+str(len(prev_scene.cluster_list)) + " clusters in previous scene")
@@ -25,6 +25,12 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
         # set all clusters to be unassigned
         cur_scene.reset_cluster_assignments()
         prev_scene.reset_cluster_assignments()
+
+        view_alignment_manager.register_scenes(cur_scene,prev_scene,root_scene)
+
+        # align cur_scene and prev_scene clouds with root_scene
+        # gives us: transform. apply this to the cluster clouds
+        # recalculate bbox and points from this
 
         c_max = len(cur_scene.cluster_list)
         num_assigned = 0
@@ -86,7 +92,7 @@ class ClusterScore:
 
 
 class NaiveClusterTrackingStrategy(ClusterTrackingStrategy):
-    def track(self,cur_scene,prev_scene):
+    def track(self,cur_scene,prev_scene,root_scene):
         rospy.loginfo("NaiveClusterTrackingStrategy")
         rospy.loginfo(""+str(len(cur_scene.cluster_list)) + " clusters in cur scene")
         rospy.loginfo(""+str(len(prev_scene.cluster_list)) + " clusters in prev scene")

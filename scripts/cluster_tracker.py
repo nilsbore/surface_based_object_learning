@@ -25,8 +25,8 @@ import image_geometry
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
 import base64
-from roi_filter import ROIFilter
-
+#from roi_filter import ROIFilter
+from view_registration import ViewAlignmentManager
 
 class BBox():
     """ Bounding box of an object with getter functions.
@@ -157,33 +157,7 @@ class SegmentedScene:
         tr_s.header.frame_id = 'map'
         tr_s.child_frame_id = self.child_camera_frame
         tr_s.transform = tr
-
-        t_kdl = self.transform_to_kdl(tr_s)
-        points_out = []
-        for p_in in pc2.read_points(cloud):
-            p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
-            points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
-
-        res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
-        return res
-
-    def transform_cloud_to_base(self,cloud):
-        rospy.loginfo("to base")
-
-        t = self.listener.getLatestCommonTime("base_link", self.child_camera_frame)
-        self.listener.waitForTransform("base_link", self.child_camera_frame, t, rospy.Duration(15.0))
-        tr_r = self.listener.lookupTransform("base_link", self.child_camera_frame, t)
-
-        tr = Transform()
-        tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
-        tr.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
-
-        tr_s = TransformStamped()
-        tr_s.header = std_msgs.msg.Header()
-        tr_s.header.stamp = rospy.Time.now()
-        tr_s.header.frame_id = 'base_link'
-        tr_s.child_frame_id = self.child_camera_frame
-        tr_s.transform = tr
+        self.transform_frame_to_map = tr
 
         t_kdl = self.transform_to_kdl(tr_s)
         points_out = []
@@ -200,6 +174,7 @@ class SegmentedScene:
         t = self.listener.getLatestCommonTime(self.child_camera_frame, self.root_camera_frame)
         self.listener.waitForTransform(self.child_camera_frame, self.root_camera_frame, t, rospy.Duration(5.0))
         tr_r = self.listener.lookupTransform(self.child_camera_frame, self.root_camera_frame, t)
+        self.transform_to_camera = tr_r
 
         tr = Transform()
         tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
@@ -211,6 +186,7 @@ class SegmentedScene:
         tr_s.header.frame_id = self.child_camera_frame
         tr_s.child_frame_id = self.root_camera_frame
         tr_s.transform = tr
+        self.transform_camera_to_frame = tr
 
         t_kdl = self.transform_to_kdl(tr_s)
         points_out = []
@@ -304,6 +280,7 @@ class SegmentedScene:
 
     def __init__(self,indices,input_scene_cloud,roi_filter):
         self.set_frames(input_scene_cloud)
+        self.scene_id = str(uuid.uuid4())
         self.clean_setup = False
         #rospy.loginfo("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
@@ -315,11 +292,10 @@ class SegmentedScene:
 
         self.camera_msg = self.get_camera_info_topic()
         if(self.camera_msg is None):
-            rospy.logerr("Unable to locate camera_info topic")
+            rospy.logerr("Unable to locate camera_info topic. This is fatal.")
             rospy.logerr("Exiting")
             return
 
-        #rospy.loginfo("waiting for transform")
         try:
             t = self.listener.getLatestCommonTime("map", self.root_camera_frame)
             self.listener.waitForTransform("map", self.root_camera_frame, t, rospy.Duration(10.0))
@@ -353,7 +329,6 @@ class SegmentedScene:
 
         # rospy.loginfo("loading clusters")
         rospy.loginfo("Located: %d candidate clusters", len(indices.clusters_indices))
-        rospy.loginfo("ROI Filtering is ON")
 
         for root_cluster in indices.clusters_indices:
             map_points_data = []
@@ -648,12 +623,15 @@ class SOMAClusterTracker:
         self.segmentation_service = "/pcl_segmentation_service/pcl_segmentation"
         self.cur_scene = None
         self.prev_scene = None
+        self.root_scene = None
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
         self.roi_filter = None
+        self.view_alignment_manager = ViewAlignmentManager()
 
     def reset(self):
         self.cur_scene = None
         self.prev_scene = None
+        self.root_scene = None
 
     def add_unsegmented_scene(self,data):
         # takes in a SegmentedScene
@@ -666,8 +644,11 @@ class SOMAClusterTracker:
 
         try:
             out = self.segmentation.seg_service(cloud=data)
-
             new_scene = SegmentedScene(out,data,self.roi_filter)
+
+            # store the root scene so we can align future clouds in reference to it
+            if(self.root_scene is None):
+                self.root_scene = new_scene
 
             rospy.loginfo("new scene added, with " + str(new_scene.num_clusters) + " clusters")
             self.cur_scene = new_scene
@@ -675,7 +656,7 @@ class SOMAClusterTracker:
             if(self.prev_scene):
                 rospy.loginfo("we have a previous observation to compare to")
                 tracker = VotingBasedClusterTrackingStrategy()
-                tracker.track(self.cur_scene,self.prev_scene)
+                tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
             else:
                 rospy.loginfo("no previous scene to compare to, skipping merging step, all clusters regarded as new")
         except rospy.ServiceException, e:
@@ -746,4 +727,10 @@ class SegmentationWrapper:
 
 
 if __name__ == '__main__':
+    rospy.init_node('CT_TEST_NODE', anonymous = True)
     tracker = SOMAClusterTracker()
+    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    tracker.add_unsegmented_scene(cloud)
+    rospy.sleep(5)
+    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    tracker.add_unsegmented_scene(cloud)
