@@ -17,7 +17,7 @@ import tf
 import PyKDL
 import tf2_ros
 import geometry_msgs.msg
-from cluster_tracking_strategies import NaiveClusterTrackingStrategy, VotingBasedClusterTrackingStrategy
+from cluster_tracking_strategies import *
 from tf import transformations
 import uuid
 import random
@@ -27,6 +27,7 @@ import cv2
 import base64
 #from roi_filter import ROIFilter
 from view_registration import ViewAlignmentManager
+import python_pcd
 
 class BBox():
     """ Bounding box of an object with getter functions.
@@ -52,21 +53,6 @@ class BBox():
             return True
         return False
 
-    def is_colliding(self,ext_bb):
-        x_min = self.get_x_min()
-        x_max = self.get_x_max()
-        y_min = self.get_y_min()
-        y_max = self.get_y_max()
-
-        e_x_min = ext_bb.get_x_min()
-        e_x_max = ext_bb.get_x_max()
-        e_y_min = ext_bb.get_y_min()
-        e_y_max = ext_bb.get_y_max()
-
-        if (x_max >= e_x_min and x_min <= e_x_max and y_max >= e_y_min and y_min <= e_y_max):
-            return True
-        return False
-
 
 class SegmentedCluster:
     def __init__(self,idc,cluster_indices):
@@ -79,6 +65,7 @@ class SegmentedCluster:
         self.bbox = None
         self.assigned = False
         self.label = None
+
 
 
     def reset_assignment(self):
@@ -282,6 +269,7 @@ class SegmentedScene:
         self.set_frames(input_scene_cloud)
         self.scene_id = str(uuid.uuid4())
         self.clean_setup = False
+        self.cluster_map = {}
         #rospy.loginfo("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.input_scene_cloud = input_scene_cloud
@@ -405,7 +393,7 @@ class SegmentedScene:
                 # this is technically a bit hacky and slow, but on the scale we're doing it
                 # it really doesn't matter
                 for p in self.get_moore_neighbourhood([rgb_y,rgb_x]):
-                    rgb_mask[p[0],p[1]] = [255,255,255]
+                    rgb_mask[int(p[0]),int(p[1])] = [255,255,255]
 
                 if(rgb_x < rgb_min_x):
                     rgb_min_x = rgb_x
@@ -576,7 +564,7 @@ class SegmentedScene:
             if(x_start < 0):
                 x_start = 0
 
-            cur_cluster.cv_image_cropped = cv_image[y_start:y_end, x_start:x_end]
+            cur_cluster.cv_image_cropped = cv_image[int(y_start):int(y_end), int(x_start):int(x_end)]
 
             cur_cluster.cropped_image = bridge.cv2_to_imgmsg(cur_cluster.cv_image_cropped, encoding="bgr8")
 
@@ -607,10 +595,9 @@ class SegmentedScene:
             cur_cluster.bbox_local = bbox_local
             cur_cluster.outer_core_bbox = outer_core_bbox
 
-            # rospy.loginfo("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
 
-        #    rospy.loginfo("is centre point in bbox? " + str(cur_cluster.bbox.contains_point(cur_cluster.map_centroid)))
             self.cluster_list.append(cur_cluster)
+            self.cluster_map[cur_cluster.cluster_id] = cur_cluster
             self.clean_setup = True
 
 
@@ -655,7 +642,7 @@ class SOMAClusterTracker:
 
             if(self.prev_scene):
                 rospy.loginfo("we have a previous observation to compare to")
-                tracker = VotingBasedClusterTrackingStrategy()
+                tracker = ViewAlignedVotingBasedClusterTrackingStrategy()
                 tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
             else:
                 rospy.loginfo("no previous scene to compare to, skipping merging step, all clusters regarded as new")
@@ -729,8 +716,10 @@ class SegmentationWrapper:
 if __name__ == '__main__':
     rospy.init_node('CT_TEST_NODE', anonymous = True)
     tracker = SOMAClusterTracker()
-    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    #cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    cloud = python_pcd.read_pcd("tests/cloud_00000012.pcd")
+    cloud = cloud[0]
     tracker.add_unsegmented_scene(cloud)
     rospy.sleep(5)
-    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    #cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
     tracker.add_unsegmented_scene(cloud)

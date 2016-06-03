@@ -3,8 +3,11 @@
 import roslib
 import rospy
 import numpy as np
-
+from view_registration import ViewAlignmentManager
 import Queue as q
+from cluster_tracker import BBox
+import sensor_msgs.point_cloud2 as pc2
+from sensor_msgs.msg import PointCloud2, PointField
 
 class ClusterTrackingStrategy:
     def __init__(self):
@@ -15,8 +18,43 @@ class ClusterTrackingStrategy:
     def track(self,cur_scene,prev_scene,root_scene):
         rospy.loginfo("-- Performing Tracking")
 
+class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
 
-class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
+    def get_points(self,cloud):
+        points = []
+        for p in pc2.read_points(cloud):
+            points.append([p[0],p[1],p[2]])
+        return points
+
+    def calculate_bbox(self,cluster):
+        min_x=min_y=min_z=99999
+        max_x=max_y=max_z = -99999
+
+        for point in pc2.read_points(cluster):
+            x = point[0]
+            y = point[1]
+            z = point[2]
+
+            if(x < min_x):
+                min_x = x
+            if(x > max_x):
+                max_x = x
+
+            if(y < min_y):
+                min_y = y
+            if(y > max_x):
+                max_y = y
+
+            if(z < min_z):
+                min_z = z
+            if(z > max_x):
+                max_z = z
+
+        return BBox(min_x,max_x,min_y,max_y,min_z,max_z)
+
+
+
+
     def track(self,cur_scene,prev_scene,root_scene,view_alignment_manager):
         rospy.loginfo("VotingBasedClusterTrackingStrategy")
         rospy.loginfo(""+str(len(cur_scene.cluster_list)) + " clusters in this scene")
@@ -26,7 +64,90 @@ class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
         cur_scene.reset_cluster_assignments()
         prev_scene.reset_cluster_assignments()
 
-        view_alignment_manager.register_scenes(cur_scene,prev_scene,root_scene)
+        # align cur_scene and prev_scene clouds with root_scene
+        # gives us: transform. apply this to the cluster clouds
+        # recalculate bbox and points from this
+        aligned_clusters = view_alignment_manager.register_scenes(cur_scene,prev_scene,root_scene)
+        print("done aligning")
+
+
+        c_max = len(cur_scene.cluster_list)
+        num_assigned = 0
+        use_core = False
+
+        scores = {}
+
+        for cur_cluster in cur_scene.cluster_list:
+            for prev_cluster in prev_scene.cluster_list:
+                # initalise score between these clusters to 0
+                scores[(cur_cluster,prev_cluster)] = ClusterScore(cur_cluster,prev_cluster,0)
+
+                prev_aligned = None
+
+                for x in aligned_clusters[prev_scene.scene_id]:
+                    if x[0] == prev_cluster.cluster_id:
+                        prev_aligned = x[1]
+                        break
+
+                prev_aligned_bbox = self.calculate_bbox(prev_aligned)
+
+                cur_aligned = None
+                for x in aligned_clusters[cur_scene.scene_id]:
+                    if x[0] == cur_cluster.cluster_id:
+                        cur_aligned = x[1]
+                        break
+
+                cur_aligned_points = self.get_points(cur_aligned)
+
+                for point in cur_aligned_points:
+                    if(prev_aligned_bbox.contains_point(point)):
+                        # increment the score if a point in the current cluster is in the bbox of the previous cluster
+                        scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
+                        if(use_core):
+                            if(prev_cluster.outer_core_bbox.contains_pointstamped(point.point)):
+                                #rospy.loginfo("point is in outer core!")
+                                scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
+
+        rospy.loginfo("raw scores")
+        # normalise scores
+        for s in scores:
+            scores[s].score = (float)(scores[s].score)/(len(scores[s].one.data_world))
+            rospy.loginfo(str(scores[s].score))
+
+        # assign cluster
+        for i in scores:
+            cur = scores[i].one
+            best_score = 0
+            best_cluster = None
+            if(scores[i].one.assigned is False and scores[i].two.assigned is False):
+                for j in scores:
+                    if(scores[j].one == cur):
+                        can = scores[j].two
+                        if(scores[j].score >= scores[i].score):
+                            if(scores[j].score > 0):
+                                best_score = scores[j].score
+                                best_cluster = can
+
+                if(best_cluster != None):
+                    rospy.loginfo("best score for: " + str(cur_scene.cluster_list.index(cur))  + " is: " + str(best_score) +" at best cluster: " + str(prev_scene.cluster_list.index(best_cluster)))
+                    scores[i].one.assigned = True
+                    scores[i].two.assigned = True
+                    rospy.loginfo("assigned cluster with index " + str(cur_scene.cluster_list.index(cur))  + " in cur frame, to prev cluster with index " + str(prev_scene.cluster_list.index(best_cluster)))
+                    cur.cluster_id = best_cluster.cluster_id
+                    rospy.loginfo("that cluster UUID is: " + str(best_cluster.cluster_id))
+                else:
+                    rospy.loginfo("Couldn't find a good cluster for cluster: " + scores[i].one.cluster_id + "(May be a brand new segment, or incomparable to previously seen segments)")
+
+
+class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
+    def track(self,cur_scene,prev_scene,root_scene):
+        rospy.loginfo("VotingBasedClusterTrackingStrategy")
+        rospy.loginfo(""+str(len(cur_scene.cluster_list)) + " clusters in this scene")
+        rospy.loginfo(""+str(len(prev_scene.cluster_list)) + " clusters in previous scene")
+
+        # set all clusters to be unassigned
+        cur_scene.reset_cluster_assignments()
+        prev_scene.reset_cluster_assignments()
 
         # align cur_scene and prev_scene clouds with root_scene
         # gives us: transform. apply this to the cluster clouds
