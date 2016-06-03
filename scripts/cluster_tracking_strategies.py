@@ -27,8 +27,16 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
             points.append([p[0],p[1],p[2]])
         return points
 
+
+    def calculate_overlap(self,a,b):
+        dist = np.linalg.norm(a-b)
+        if(dist < 0.01):
+            return True
+        return False
+
+
     def calculate_bbox(self,cluster):
-        min_x=min_y=min_z=99999
+        min_x=min_y=min_z= 99999
         max_x=max_y=max_z = -99999
 
         for point in pc2.read_points(cluster):
@@ -112,12 +120,15 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                 prev_aligned_points = self.get_points(prev_aligned)
                 cur_aligned_bbox = self.calculate_bbox(cur_aligned)
 
+                for a in cur_aligned_points:
+                    for b in prev_aligned_points:
+                        if(self.calculate_overlap(np.array(a[0],a[1],a[2]),np.array(b[0],b[1],b[2]))):
+                            scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
+                #for point in cur_aligned_points:
+                #    if(prev_aligned_bbox.contains_point(point)):
+                #        scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
 
 
-                for point in cur_aligned_points:
-                    if(prev_aligned_bbox.contains_point(point)):
-                        # increment the score if a point in the current cluster is in the bbox of the previous cluster
-                        scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
 
         rospy.loginfo("raw scores")
         # normalise scores
