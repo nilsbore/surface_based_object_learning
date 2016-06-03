@@ -42,7 +42,7 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
 
             if(y < min_y):
                 min_y = y
-            if(y > max_x):
+            if(y > max_y):
                 max_y = y
 
             if(z < min_z):
@@ -50,6 +50,12 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
             if(z > max_x):
                 max_z = z
 
+        print(min_x)
+        print(max_x)
+        print(min_y)
+        print(max_y)
+        print(min_z)
+        print(max_z)
         return BBox(min_x,max_x,min_y,max_y,min_z,max_z)
 
 
@@ -86,6 +92,7 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
 
                 for x in aligned_clusters[prev_scene.scene_id]:
                     if x[0] == prev_cluster.cluster_id:
+                        print("got prev aligned")
                         prev_aligned = x[1]
                         break
 
@@ -94,19 +101,17 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                 cur_aligned = None
                 for x in aligned_clusters[cur_scene.scene_id]:
                     if x[0] == cur_cluster.cluster_id:
+                        print("got cur aligned")
                         cur_aligned = x[1]
                         break
 
+                print("getting points")
                 cur_aligned_points = self.get_points(cur_aligned)
 
                 for point in cur_aligned_points:
                     if(prev_aligned_bbox.contains_point(point)):
                         # increment the score if a point in the current cluster is in the bbox of the previous cluster
                         scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
-                        if(use_core):
-                            if(prev_cluster.outer_core_bbox.contains_pointstamped(point.point)):
-                                #rospy.loginfo("point is in outer core!")
-                                scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
 
         rospy.loginfo("raw scores")
         # normalise scores

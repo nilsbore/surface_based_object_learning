@@ -123,9 +123,8 @@ class ViewAlignmentManager:
         scenes = [cam_root,cam_prev,cam_cur]
 
         map_root_t = root_scene.transform_frame_to_map
-        map_cur_t = cur_scene.transform_frame_to_map
         map_prev_t = prev_scene.transform_frame_to_map
-
+        map_cur_t = cur_scene.transform_frame_to_map
         # align these clouds
         response = self.reg_serv(additional_views=scenes,additional_views_odometry_transforms=[map_root_t,map_prev_t,map_cur_t])
         print(response)

@@ -642,8 +642,14 @@ class SOMAClusterTracker:
 
             if(self.prev_scene):
                 rospy.loginfo("we have a previous observation to compare to")
+
+                print("TRACKING USING ALIGNED VOTING METHOD")
                 tracker = ViewAlignedVotingBasedClusterTrackingStrategy()
                 tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
+                print("\n")
+                print("TRACKING USING NON-ALIGNED VOTING METHOD")
+                tracker = VotingBasedClusterTrackingStrategy()
+                tracker.track(self.cur_scene,self.prev_scene,self.root_scene)
             else:
                 rospy.loginfo("no previous scene to compare to, skipping merging step, all clusters regarded as new")
         except rospy.ServiceException, e:
