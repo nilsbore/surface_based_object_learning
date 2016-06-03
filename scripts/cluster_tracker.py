@@ -137,6 +137,7 @@ class SegmentedScene:
         tr = Transform()
         tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
         tr.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
+        self.transform_frame_to_map = tr
 
         tr_s = TransformStamped()
         tr_s.header = std_msgs.msg.Header()
@@ -144,7 +145,7 @@ class SegmentedScene:
         tr_s.header.frame_id = 'map'
         tr_s.child_frame_id = self.child_camera_frame
         tr_s.transform = tr
-        self.transform_frame_to_map = tr
+
 
         t_kdl = self.transform_to_kdl(tr_s)
         points_out = []

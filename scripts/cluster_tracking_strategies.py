@@ -9,6 +9,7 @@ from cluster_tracker import BBox
 import sensor_msgs.point_cloud2 as pc2
 from sensor_msgs.msg import PointCloud2, PointField
 
+
 class ClusterTrackingStrategy:
     def __init__(self):
         self.talk = True
@@ -50,12 +51,12 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
             if(z > max_z):
                 max_z = z
 
-        print(min_x)
-        print(max_x)
-        print(min_y)
-        print(max_y)
-        print(min_z)
-        print(max_z)
+        #print(min_x)
+        #print(max_x)
+        #print(min_y)
+        #print(max_y)
+        #print(min_z)
+        #print(max_z)
         return BBox(min_x,max_x,min_y,max_y,min_z,max_z)
 
 
@@ -92,21 +93,26 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
 
                 for x in aligned_clusters[prev_scene.scene_id]:
                     if x[0] == prev_cluster.cluster_id:
-                        print("got prev aligned")
+                        #print("got prev aligned")
                         prev_aligned = x[1]
                         break
 
                 prev_aligned_bbox = self.calculate_bbox(prev_aligned)
 
+
                 cur_aligned = None
                 for x in aligned_clusters[cur_scene.scene_id]:
                     if x[0] == cur_cluster.cluster_id:
-                        print("got cur aligned")
+                        #print("got cur aligned")
                         cur_aligned = x[1]
                         break
 
-                print("getting points")
+                #print("getting points")
                 cur_aligned_points = self.get_points(cur_aligned)
+                prev_aligned_points = self.get_points(prev_aligned)
+                cur_aligned_bbox = self.calculate_bbox(cur_aligned)
+
+
 
                 for point in cur_aligned_points:
                     if(prev_aligned_bbox.contains_point(point)):
