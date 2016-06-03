@@ -35,19 +35,19 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
             y = point[1]
             z = point[2]
 
-            if(x < min_x):
+            if(x <= min_x):
                 min_x = x
             if(x > max_x):
                 max_x = x
 
-            if(y < min_y):
+            if(y <= min_y):
                 min_y = y
             if(y > max_y):
                 max_y = y
 
-            if(z < min_z):
+            if(z <= min_z):
                 min_z = z
-            if(z > max_x):
+            if(z > max_z):
                 max_z = z
 
         print(min_x)
@@ -62,7 +62,7 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
 
 
     def track(self,cur_scene,prev_scene,root_scene,view_alignment_manager):
-        rospy.loginfo("VotingBasedClusterTrackingStrategy")
+        rospy.loginfo("ViewAlignedVotingBasedClusterTrackingStrategy")
         rospy.loginfo(""+str(len(cur_scene.cluster_list)) + " clusters in this scene")
         rospy.loginfo(""+str(len(prev_scene.cluster_list)) + " clusters in previous scene")
 

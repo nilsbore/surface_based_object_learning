@@ -722,10 +722,11 @@ class SegmentationWrapper:
 if __name__ == '__main__':
     rospy.init_node('CT_TEST_NODE', anonymous = True)
     tracker = SOMAClusterTracker()
-    #cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
-    cloud = python_pcd.read_pcd("tests/cloud_00000012.pcd")
-    cloud = cloud[0]
+    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    #cloud = python_pcd.read_pcd("tests/cloud_00000012.pcd")
+    #cloud = cloud[0]
     tracker.add_unsegmented_scene(cloud)
+    print("waiting a sec...")
     rospy.sleep(5)
-    #cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
     tracker.add_unsegmented_scene(cloud)
