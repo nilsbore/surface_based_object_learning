@@ -9,6 +9,8 @@ from cluster_tracker import BBox
 import sensor_msgs.point_cloud2 as pc2
 from sensor_msgs.msg import PointCloud2, PointField
 
+import pcl
+
 
 class ClusterTrackingStrategy:
     def __init__(self):
@@ -120,13 +122,15 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                 prev_aligned_points = self.get_points(prev_aligned)
                 cur_aligned_bbox = self.calculate_bbox(cur_aligned)
 
-                for a in cur_aligned_points:
-                    for b in prev_aligned_points:
-                        if(self.calculate_overlap(np.array(a[0],a[1],a[2]),np.array(b[0],b[1],b[2]))):
-                            scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
-                #for point in cur_aligned_points:
-                #    if(prev_aligned_bbox.contains_point(point)):
-                #        scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
+            #    for a in cur_aligned_points:
+            #        a_p = np.array((a[0],a[1],a[2]))
+            #        for b in prev_aligned_points:
+            #            b_p = np.array((b[0],b[1],b[2]))
+            #            if(self.calculate_overlap(a_p,b_p)):
+            #                scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
+                for point in cur_aligned_points:
+                    if(prev_aligned_bbox.contains_point(point)):
+                        scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
 
 
 
@@ -159,6 +163,84 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                     rospy.loginfo("that cluster UUID is: " + str(best_cluster.cluster_id))
                 else:
                     rospy.loginfo("Couldn't find a good cluster for cluster: " + scores[i].one.cluster_id + "(May be a brand new segment, or incomparable to previously seen segments)")
+
+class VoxelVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
+    def track(self,cur_scene,prev_scene):
+        rospy.loginfo("VoxelVotingBasedClusterTrackingStrategy")
+        rospy.loginfo(""+str(len(cur_scene.cluster_list)) + " clusters in this scene")
+        rospy.loginfo(""+str(len(prev_scene.cluster_list)) + " clusters in previous scene")
+
+        # set all clusters to be unassigned
+        cur_scene.reset_cluster_assignments()
+        prev_scene.reset_cluster_assignments()
+
+        # align cur_scene and prev_scene clouds with root_scene
+        # gives us: transform. apply this to the cluster clouds
+        # recalculate bbox and points from this
+
+        c_max = len(cur_scene.cluster_list)
+        num_assigned = 0
+        scores = {}
+        octree_res = 0.1
+
+        for cur_cluster in cur_scene.cluster_list:
+            cur_cld = pcl.PointCloud()
+            pts = []
+            for point in pc2.read_points(cur_cluster.segmented_pc_mapframe):
+                pts.append([point[0],point[1],point[2]])
+            pts = np.array(pts,dtype=np.float32)
+            cur_cld.from_array(pts)
+            cur_octree = cur_cld.make_octree(octree_res)
+            cur_octree.add_points_from_input_cloud()
+
+            cur_occupied = cur_octree.get_occupied_voxel_centers()
+
+            for prev_cluster in prev_scene.cluster_list:
+                scores[(cur_cluster,prev_cluster)] = ClusterScore(cur_cluster,prev_cluster,0)
+                pre_cld = pcl.PointCloud()
+                pts = []
+                for point in pc2.read_points(prev_cluster.segmented_pc_mapframe):
+                    pts.append([point[0],point[1],point[2]])
+                pts = np.array(pts,dtype=np.float32)
+                pre_cld.from_array(pts)
+                pre_octree = pre_cld.make_octree(octree_res)
+                pre_octree.add_points_from_input_cloud()
+
+                pre_occupied = pre_octree.get_occupied_voxel_centers()
+
+                for vc in pre_occupied:
+                    if cur_octree.is_voxel_occupied_at_point(np.array(vc,dtype=np.float32)):
+                        scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
+
+
+                scores[(cur_cluster,prev_cluster)].score = (float)(scores[(cur_cluster,prev_cluster)].score)/(len(pre_occupied))
+
+        assigned = []
+        for i in scores:
+            cur = scores[i].one
+            best_score = 0
+            best_cluster = None
+            if(cur.cluster_id not in assigned):
+                for j in scores:
+                    if(scores[j].one.cluster_id in cur.cluster_id):
+                        can = scores[j].two
+                        if(can.cluster_id not in assigned):
+                            rospy.loginfo(str(cur_scene.cluster_list.index(cur)) +" \t \t " + str(prev_scene.cluster_list.index(can)) +" \t \t " + str(scores[j].score))
+                            if(scores[j].score >= scores[i].score):
+                                if(scores[j].score > 0):
+                                    best_score = scores[j].score
+                                    best_cluster = can
+
+                if(best_cluster != None):
+                    rospy.loginfo("best score for: " + str(cur_scene.cluster_list.index(cur))  + " is: " + str(best_score) +" at best cluster: " + str(prev_scene.cluster_list.index(best_cluster)))
+                    assigned.append(cur.cluster_id)
+                    assigned.append(best_cluster.cluster_id)
+                    rospy.loginfo("assigned cluster with index " + str(cur_scene.cluster_list.index(cur))  + " in cur frame, to prev cluster with index " + str(prev_scene.cluster_list.index(best_cluster)))
+                    cur.cluster_id = best_cluster.cluster_id
+                    rospy.loginfo("that cluster UUID is: " + str(best_cluster.cluster_id))
+                else:
+                    rospy.loginfo("Couldn't find a good cluster for cluster: " + scores[i].one.cluster_id + "(May be a brand new segment, or incomparable to previously seen segments)")
+
 
 
 class VotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
