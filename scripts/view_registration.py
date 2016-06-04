@@ -107,12 +107,12 @@ class ViewAlignmentManager:
 
         # set some easy defaults
         self.root_camera_frame = "head_xtion_depth_optical_frame"
-        self.child_camera_frame = "head_xtion_depth_frame"
+        self.child_camera_frame = "base_link"
         rospy.loginfo("camera input:" + str(cloud.header.frame_id))
 
         if("head_xtion_rgb_optical_frame" in str(cloud.header.frame_id)):
             self.root_camera_frame = cloud.header.frame_id
-            self.child_camera_frame = "head_xtion_rgb_frame"
+            self.child_camera_frame = "base_link"
 
         rospy.loginfo("frames are:")
         rospy.loginfo(self.root_camera_frame)
@@ -132,7 +132,7 @@ class ViewAlignmentManager:
         map_cur_t = cur_scene.transform_frame_to_map
         # align these clouds
         response = self.reg_serv(additional_views=scenes,additional_views_odometry_transforms=[map_root_t,map_prev_t,map_cur_t])
-        print(response)
+        #print(response)
         view_trans = response.additional_view_transforms
         transformed_clusters = {}
 

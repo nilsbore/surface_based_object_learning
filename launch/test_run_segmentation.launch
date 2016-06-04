@@ -1,17 +1,35 @@
 <launch>
-	<arg name="models_dir" /> <!-- required -->
-	<arg name="training_dir" />  <!-- required -->
+	<!--
+		Unused in the kind of segmentation we are employing, but available for others
 	<arg name="nn" default="10" />
+	<arg name="min_cluster_size" default="500" />
+	<arg name="max_vertical_plane_size" default="5000" />
+	<arg name="num_plane_inliers" default="1000" />
+	<arg name="max_angle_plane_to_ground" default="15" />
+	<arg name="table_range_min" default="0.6" />
+	<arg name="table_range_max" default="1.2" />
+	<arg name="angular_threshold_deg" default="10" /> -->
+
+	<arg name="sensor_noise_max" default="0.03" />
 	<arg name="chop_z" default="2.5" />
-	<arg name="seg_type" default="1" /> 
-	<arg name="min_cluster_size" default="500" /> 
+	<arg name="seg_type" default="1" />
+	<arg name="min_cluster_size" default="500" />
 
 	<!-- pcl segmentation Service -->
 	<node pkg="segmentation" type="pcl_segmentation_service" name="pcl_segmentation_service" output="screen" >
+	<!--
+		<param name="max_vertical_plane_size" value="$(arg max_vertical_plane_size)" type="int"/>
+		<param name="num_plane_inliers" value="$(arg num_plane_inliers)" type="int"/>
+		<param name="max_angle_plane_to_ground" value="$(arg max_angle_plane_to_ground)" type="double"/>
+		<param name="table_range_min" value="$(arg table_range_min)" type="double"/>
+		<param name="table_range_max" value="$(arg table_range_max)" type="double"/>
+		<param name="angular_threshold_deg" value="$(arg angular_threshold_deg)" type="double"/>
+-->
 		<param name="seg_type" value="$(arg seg_type)" type="int"/>
-		<param name="chop_z" value="$(arg chop_z)" type="double"/>
 		<param name="min_cluster_size" value="$(arg min_cluster_size)" type="int"/>
-	</node>
-	
-</launch>
+		<param name="chop_z" value="$(arg chop_z)" type="double"/>
+		<param name="sensor_noise_max" value="$(arg sensor_noise_max)" type="double"/>
 
+	</node>
+
+</launch>

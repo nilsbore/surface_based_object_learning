@@ -260,17 +260,17 @@ class SegmentedScene:
         if("head_xtion_rgb_optical_frame" in str(cloud.header.frame_id)):
             rospy.loginfo("found head_xtion_rgb_optical_frame")
             self.root_camera_frame = cloud.header.frame_id
-            self.child_camera_frame = "head_xtion_rgb_frame"
+            self.child_camera_frame = "base_link"
 
         if("head_xtion_depth_optical_frame" in str(cloud.header.frame_id)):
             rospy.loginfo("found head_xtion_depth_optical_frame")
             self.root_camera_frame = cloud.header.frame_id
-            self.child_camera_frame = "head_xtion_depth_frame"
+            self.child_camera_frame = "base_link"
 
         # fixes issue when loading files from chris' pcd loader
         if(cloud.header.frame_id in "/pcd_cloud"):
             self.root_camera_frame = "/head_xtion_depth_optical_frame"
-            self.child_camera_frame = "/head_xtion_depth_frame"
+            self.child_camera_frame = "/base_link"
 
         rospy.loginfo("frames are:")
         rospy.loginfo(self.root_camera_frame)
@@ -336,6 +336,7 @@ class SegmentedScene:
             rospy.loginfo("--- CLUSTER ----")
 
             cid = str(uuid.uuid4()) # str so we can later link it to a soma2 object, which indexes by string
+            rospy.loginfo("id: " + cid)
             #rospy.loginfo("randomly assigned temporary cid: " + str(cid))
             cur_cluster = SegmentedCluster(cid,root_cluster)
             #raw = []
@@ -659,17 +660,18 @@ class SOMAClusterTracker:
             if(self.prev_scene):
                 rospy.loginfo("we have a previous observation to compare to")
                 print("")
+                print("TRACKING USING ALIGNED VOXEL VOTING METHOD")
+                tracker = VoxelViewAlignedVotingBasedClusterTrackingStrategy()
+
+                tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
+                #print("\n")
                 print("TRACKING USING ALIGNED VOTING METHOD")
                 tracker = ViewAlignedVotingBasedClusterTrackingStrategy()
                 tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
-                print("\n")
-                print("TRACKING USING NON-ALIGNED VOTING METHOD")
-                tracker = VotingBasedClusterTrackingStrategy()
-                tracker.track(self.cur_scene,self.prev_scene,self.root_scene)
-                print("\n")
-                print("TRACKING USING VOXEL VOTING METHOD")
-                tracker = VoxelVotingBasedClusterTrackingStrategy()
-                tracker.track(self.cur_scene,self.prev_scene)
+                #print("\n")
+                #print("TRACKING USING VOXEL VOTING METHOD")
+                #tracker = VoxelVotingBasedClusterTrackingStrategy()
+                #tracker.track(self.cur_scene,self.prev_scene)
             else:
                 rospy.loginfo("no previous scene to compare to, skipping merging step, all clusters regarded as new")
         except rospy.ServiceException, e:
@@ -742,11 +744,15 @@ class SegmentationWrapper:
 if __name__ == '__main__':
     rospy.init_node('CT_TEST_NODE', anonymous = True)
     tracker = SOMAClusterTracker()
-    #inc = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
-    cloud = python_pcd.read_pcd("tsc1.pcd")
-    cloud = cloud[0]
+    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    #cloud = python_pcd.read_pcd("tsc1.pcd")
+    #cloud = cloud[0]
     tracker.add_unsegmented_scene(cloud)
-    print("waiting a sec...")
-    rospy.sleep(5)
-    #cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    invar = raw_input('press key to take view')
+    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
     tracker.add_unsegmented_scene(cloud)
+    invar = raw_input('press key to take view')
+    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    tracker.add_unsegmented_scene(cloud)
+
+    rospy.spin()
