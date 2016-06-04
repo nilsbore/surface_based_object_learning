@@ -57,7 +57,12 @@ class ViewAlignmentManager:
             p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
             points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
 
-        res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
+        fil_fields = []
+        for x in cloud.fields:
+            if(x.name in "x" or x.name in "y" or x.name in "z" or x.name in "rgb"):
+                fil_fields.append(x)
+
+        res = pc2.create_cloud(tr_s.header, fil_fields, points_out)
         return res
 
     def transform_cloud_and_return_points(self,cloud,translation,rotation):

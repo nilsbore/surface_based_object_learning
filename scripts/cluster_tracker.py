@@ -28,6 +28,7 @@ import base64
 #from roi_filter import ROIFilter
 from view_registration import ViewAlignmentManager
 import python_pcd
+import pcl
 
 class BBox():
     """ Bounding box of an object with getter functions.
@@ -149,11 +150,16 @@ class SegmentedScene:
 
         t_kdl = self.transform_to_kdl(tr_s)
         points_out = []
-        for p_in in pc2.read_points(cloud):
+        for p_in in pc2.read_points(cloud,field_names=["x","y","z","rgb"]):
             p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
             points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
 
-        res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
+        fil_fields = []
+        for x in cloud.fields:
+            if(x.name in "x" or x.name in "y" or x.name in "z" or x.name in "rgb"):
+                fil_fields.append(x)
+
+        res = pc2.create_cloud(cloud.header, fil_fields, points_out)
         return res
 
     def transform_cloud_to_frame(self,cloud):
@@ -178,11 +184,16 @@ class SegmentedScene:
 
         t_kdl = self.transform_to_kdl(tr_s)
         points_out = []
-        for p_in in pc2.read_points(cloud):
+        for p_in in pc2.read_points(cloud,field_names=["x","y","z","rgb"]):
             p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
             points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
 
-        res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
+        fil_fields = []
+        for x in cloud.fields:
+            if(x.name in "x" or x.name in "y" or x.name in "z" or x.name in "rgb"):
+                fil_fields.append(x)
+
+        res = pc2.create_cloud(cloud.header, fil_fields, points_out)
         return res
 
     def get_camera_info_topic(self):
@@ -493,11 +504,15 @@ class SegmentedScene:
 
             cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
 
+            fil_fields = []
+            for x in input_scene_cloud.fields:
+                if(x.name in "x" or x.name in "y" or x.name in "z" or x.name in "rgb"):
+                    fil_fields.append(x)
 
             header_cam = std_msgs.msg.Header()
             header_cam.stamp = rospy.Time.now()
             header_cam.frame_id = self.root_camera_frame
-            cur_cluster.segmented_pc_camframe = pc2.create_cloud(header_cam, input_scene_cloud.fields, cluster_camframe)
+            cur_cluster.segmented_pc_camframe = pc2.create_cloud(header_cam, fil_fields, cluster_camframe)
 
 
 
@@ -727,11 +742,11 @@ class SegmentationWrapper:
 if __name__ == '__main__':
     rospy.init_node('CT_TEST_NODE', anonymous = True)
     tracker = SOMAClusterTracker()
-    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
-    #cloud = python_pcd.read_pcd("tests/cloud_00000012.pcd")
-    #cloud = cloud[0]
+    #inc = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    cloud = python_pcd.read_pcd("tsc1.pcd")
+    cloud = cloud[0]
     tracker.add_unsegmented_scene(cloud)
     print("waiting a sec...")
     rospy.sleep(5)
-    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    #cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
     tracker.add_unsegmented_scene(cloud)
