@@ -29,6 +29,7 @@ import base64
 from view_registration import ViewAlignmentManager
 import python_pcd
 import pcl
+from bham_seg import Segmentation
 
 class BBox():
     """ Bounding box of an object with getter functions.
@@ -631,6 +632,7 @@ class SOMAClusterTracker:
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
         self.roi_filter = None
         self.view_alignment_manager = ViewAlignmentManager()
+        self.segmenter = Segmentation(500,50000,2.5,False)
 
     def reset(self):
         self.cur_scene = None
@@ -647,7 +649,10 @@ class SOMAClusterTracker:
         rospy.loginfo("segmentation done")
 
         try:
-            out = self.segmentation.seg_service(cloud=data)
+            #out = self.segmentation.seg_service(cloud=data)
+            rgb,indices = self.segmenter.segment(data)
+            return True
+
             new_scene = SegmentedScene(out,data,self.roi_filter)
 
             # store the root scene so we can align future clouds in reference to it
@@ -744,15 +749,18 @@ class SegmentationWrapper:
 if __name__ == '__main__':
     rospy.init_node('CT_TEST_NODE', anonymous = True)
     tracker = SOMAClusterTracker()
+
+    #if(False):
     cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
     #cloud = python_pcd.read_pcd("tsc1.pcd")
     #cloud = cloud[0]
     tracker.add_unsegmented_scene(cloud)
-    invar = raw_input('press key to take view')
-    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
-    tracker.add_unsegmented_scene(cloud)
-    invar = raw_input('press key to take view')
-    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
-    tracker.add_unsegmented_scene(cloud)
+    if(False):
+        invar = raw_input('press key to take view')
+        cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+        tracker.add_unsegmented_scene(cloud)
+        invar = raw_input('press key to take view')
+        cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+        tracker.add_unsegmented_scene(cloud)
 
     rospy.spin()

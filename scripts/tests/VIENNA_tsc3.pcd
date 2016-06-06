@@ -1,0 +1,10 @@
+VERSION .7
+FIELDS x y z _ _ _ _ rgb _ _ _ _ _ _ _ _ _ _ _ _
+SIZE 4 4 4 1 1 1 1 4 1 1 1 1 1 1 1 1 1 1 1 1
+TYPE F F F U U U U F U U U U U U U U U U U U
+COUNT 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+WIDTH 0
+HEIGHT 1
+VIEWPOINT 0 0 0 1 0 0 0
+POINTS 0
+DATA binary
