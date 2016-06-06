@@ -63,6 +63,19 @@ class ROIFilter:
 
         rospy.loginfo("ROI Filter has located %d regions of interest",len(self.soma_polygons))
 
+    def filter_object_height(self,cloud):
+        min_y = 9000
+        max_y = -9000
+        height = 0
+        for point in pc2.read_points(cloud):
+            if(point[2] < min_y):
+                min_y = point[2]
+
+            if(point[2] > max_y):
+                max_y = point[2]
+        height = abs(max_y-min_y)
+
+
     def point_in_roi(self,point_in):
 
         # allows the system to deal with changes made to ROIs online
