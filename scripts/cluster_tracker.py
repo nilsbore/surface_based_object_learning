@@ -25,7 +25,7 @@ import image_geometry
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
 import base64
-#from roi_filter import ROIFilter
+from roi_filter import ROIFilter
 from view_registration import ViewAlignmentManager
 import python_pcd
 import pcl
@@ -630,7 +630,7 @@ class SOMAClusterTracker:
         self.prev_scene = None
         self.root_scene = None
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
-        self.roi_filter = None
+        self.roi_filter = ROIFilter()
         self.view_alignment_manager = ViewAlignmentManager()
         self.segmenter = Segmentation(500,50000,2.5,False)
 
