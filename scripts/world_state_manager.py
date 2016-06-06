@@ -12,6 +12,7 @@ import cv2
 # ROS stuff
 from sensor_msgs.msg import PointCloud2, PointField
 from cluster_tracker import SOMAClusterTracker
+from recognition_manager import ObjectRecognitionManager
 from view_registration import ViewAlignmentManager
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo, JointState
 from std_srvs.srv import Trigger, TriggerResponse
@@ -66,10 +67,6 @@ class WorldStateManager:
         self.cur_sequence_obj_ids = []
         self.cur_view_soma_ids = []
 
-        # TODO: THIS NEEDS TO BE *REGISTERED* EVENTUALLY
-        self.transform_store = TransformationStore()
-        self.transform_store.create_live()
-
         # get the current point cloud
         #if(talk): rospy.loginfo("waiting for pc")
         #rospy.wait_for_message('/head_xtion/depth_registered/points',PointCloud2)
@@ -101,15 +98,7 @@ class WorldStateManager:
         rospy.loginfo("done")
         self.soma_update = rospy.ServiceProxy('soma2/update_object',SOMA2UpdateObject)
 
-        try:
-            rospy.loginfo("getting recognition service")
-            rospy.wait_for_service('/recognition_service/sv_recognition',20)
-            self.recog_service = rospy.ServiceProxy('/recognition_service/sv_recognition',recognize)
-            rospy.loginfo("Got the recognition service!")
-        except Exception,e:
-            rospy.loginfo("Unable to get object recognition service, continuing but no object recognition will be performed")
-            pass
-
+        self.recog_manager = ObjectRecognitionManager()
 
         rospy.loginfo("setting up view alignment manager")
         self.view_alignment_manager = ViewAlignmentManager()
@@ -167,7 +156,7 @@ class WorldStateManager:
 
     def end_obs(self,req):
         rospy.loginfo("-- received signal to terminate sequence of observations --")
-        self.do_view_alignment()
+        self.do_postprocessing()
         return TriggerResponse(True,"Observations Ending: Assuming all previous observations were from the same sequence.")
 
     def get_camera_info_topic_as_string(self):
@@ -272,30 +261,40 @@ class WorldStateManager:
                 scene = self.cluster_tracker.add_unsegmented_scene(req.input)
                 if(scene.clean_setup is True):
                     scene.waypoint = req.waypoint
+                    rospy.loginfo("---- Running Object Recognition ----")
+                    self.recog_manager.recognise_scene(req.input)
+                    self.recog_manager.assign_labels(scene)
+
                     self.assign_clusters(scene,self.cluster_tracker.prev_scene)
                     self.pending_obs.append(scene)
+
                     rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
 
-                    rospy.loginfo("---- Running Object Recognition ----")
                     #rospy.loginfo("Header of cloud: ")
                     #rospy.loginfo(req.input.header)
 
-                    recog_out = self.recog_service(cloud=req.input)
+                #    recog_out = self.recog_service(cloud=req.input)
 
-                    rospy.loginfo("---- Printing Results of Object Recognition ----")
+                #    rospy.loginfo("---- Printing Results of Object Recognition ----")
 
-                    labels = recog_out.ids
-                    confidences = recog_out.confidence
+                #    labels = recog_out.ids
+                #    confidences = recog_out.confidence
 
-                    print("LABELS: ")
-                    print(labels)
+                #    print("LABELS: ")
+                #    print(labels)
 
-                    print("CONFIDENCES: ")
-                    print(confidences)
+                #    print("CONFIDENCES: ")
 
-                    fn = str(uuid.uuid4())
-                    print("WRITING SCENE TO FILE: " + fn)
-                    python_pcd.write_pcd("fn+".pcd", req.input)
+
+                #    print(confidences)
+
+
+
+                #    fn = str(uuid.uuid4())
+
+                #    print("WRITING SCENE TO FILE: " + fn)
+
+                #    python_pcd.write_pcd("  fn+".pcd", req.input)
 
                     rospy.sleep(15)
                     return WorldUpdateResponse(True,self.cur_view_soma_ids)
@@ -309,8 +308,8 @@ class WorldStateManager:
 
             return WorldUpdateResponse(False,self.cur_view_soma_ids)
 
-    def do_view_alignment(self):
-        rospy.loginfo("-- beginning post-processing, attempting view alignment -- ")
+    def do_postprocessing(self):
+        rospy.loginfo("-- beginning post-processing, attempting view alignment and object label updates -- ")
         for object_id in self.cur_sequence_obj_ids:
             soma_objects = self.get_soma_objects_with_id(object_id)
             rospy.loginfo("attempting to process object: " + str(object_id))
@@ -360,41 +359,19 @@ class WorldStateManager:
                     rospy.logerr(e)
                     continue
             else:
-                rospy.loginfo("ignoring")
-                rospy.loginfo("successfully updated object")
+                rospy.loginfo("not running view alignment, only one view")
 
-        self.do_object_recognition()
+        rospy.loginfo("attempting to update object's recognition label")
+
+        try:
+            soma_objects.objects[0].type = world_object.label
+            self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
+            rospy.loginfo("done! this object recognised as a " + world_object.label + " with confidence: " + str(world_object.label_confidence))
+        except Exception,e:
+            rospy.logerr("Problem updating SOMA object label.")
+            rospy.logerr(e)
+
         rospy.loginfo("post-processing complete")
-
-    def do_object_recognition(self):
-        print("running batch object recog")
-        for object_id in self.cur_sequence_obj_ids:
-            soma_objects = self.get_soma_objects_with_id(object_id)
-            soma_object = soma_objects.objects[0]
-
-            if(not soma_object):
-                rospy.loginfo("SOMA object doesn't exist")
-                continue
-            else:
-                rospy.loginfo("got this SOMA object")
-
-            if(not self.world_model.does_object_exist(object_id)):
-                rospy.logerr("WORLD object doesn't exist")
-                continue
-            try:
-                world_object = self.world_model.get_object(object_id)
-            except rospy.ServiceException, e:
-                rospy.logerr("DB ERROR")
-                continue
-
-            # send the point cloud of the SOMA object to object recognition #
-
-            # get back the results #
-
-            # update the world_model object and its class distributions #
-
-            # do something else? #
-
 
 
     def cluster_is_live(self,cluster_id,waypoint):
@@ -526,6 +503,9 @@ class WorldStateManager:
 
                 cur_cluster._point_cloud = mso
                 cur_cluster.view_episode_id = self.view_episode_id
+
+                cur_cluster.label = label.one.label
+                cur_cluster.label_confidence = label.one.confidence
 
                 #cloud_observation.add_message(cur_scene_cluster.img_bbox,"image_bounding_box")
                 #cloud_observation.add_message(cur_scene_cluster.img_centroid,"image_centroid")

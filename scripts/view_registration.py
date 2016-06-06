@@ -57,8 +57,33 @@ class ViewAlignmentManager:
             p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
             points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
 
-        res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
+        fil_fields = []
+        for x in cloud.fields:
+            if(x.name in "x" or x.name in "y" or x.name in "z" or x.name in "rgb"):
+                fil_fields.append(x)
+
+        res = pc2.create_cloud(tr_s.header, fil_fields, points_out)
         return res
+
+    def transform_cloud_and_return_points(self,cloud,translation,rotation):
+        tr = Transform()
+        tr.translation = translation
+        tr.rotation = rotation
+
+        tr_s = TransformStamped()
+        tr_s.header = std_msgs.msg.Header()
+        tr_s.header.stamp = rospy.Time.now()
+        tr_s.header.frame_id = self.child_camera_frame
+        tr_s.child_frame_id = self.root_camera_frame
+        tr_s.transform = tr
+
+        t_kdl = self.transform_to_kdl(tr_s)
+        points_out = []
+        for p_in in pc2.read_points(cloud):
+            p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
+            points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
+
+        return points_out
 
     def merge_pcs(self,clouds):
         combined_cloud_points = []
@@ -82,17 +107,48 @@ class ViewAlignmentManager:
 
         # set some easy defaults
         self.root_camera_frame = "head_xtion_depth_optical_frame"
-        self.child_camera_frame = "head_xtion_depth_frame"
+        self.child_camera_frame = "base_link"
         rospy.loginfo("camera input:" + str(cloud.header.frame_id))
 
         if("head_xtion_rgb_optical_frame" in str(cloud.header.frame_id)):
             self.root_camera_frame = cloud.header.frame_id
-            self.child_camera_frame = "head_xtion_rgb_frame"
+            self.child_camera_frame = "base_link"
 
         rospy.loginfo("frames are:")
         rospy.loginfo(self.root_camera_frame)
         rospy.loginfo(self.child_camera_frame)
 
+    def register_scenes(self,cur_scene,prev_scene,root_scene):
+        # transform these scenes to the camera frames
+        self.set_frames(cur_scene.input_scene_cloud)
+        cam_cur = self.transform_cloud(cur_scene.input_scene_cloud,cur_scene.transform_camera_to_frame.translation,cur_scene.transform_camera_to_frame.rotation)
+        cam_prev = self.transform_cloud(prev_scene.input_scene_cloud,prev_scene.transform_camera_to_frame.translation,prev_scene.transform_camera_to_frame.rotation)
+        cam_root = self.transform_cloud(root_scene.input_scene_cloud,root_scene.transform_camera_to_frame.translation,root_scene.transform_camera_to_frame.rotation)
+        bases = [root_scene,prev_scene,cur_scene]
+        scenes = [cam_root,cam_prev,cam_cur]
+
+        map_root_t = root_scene.transform_frame_to_map
+        map_prev_t = prev_scene.transform_frame_to_map
+        map_cur_t = cur_scene.transform_frame_to_map
+        # align these clouds
+        response = self.reg_serv(additional_views=scenes,additional_views_odometry_transforms=[map_root_t,map_prev_t,map_cur_t])
+        #print(response)
+        view_trans = response.additional_view_transforms
+        transformed_clusters = {}
+
+        for ts,scene,orig in zip(view_trans,scenes,bases):
+            rot = ts.rotation
+            tls = ts.translation
+            # make new clouds out of the segmented clouds in this scene
+            transformed_clusters[orig.scene_id] = []
+            for cluster in orig.cluster_list:
+                # transform data using above transforms, first to cam frame
+                cc = self.transform_cloud(cluster.segmented_pc_camframe,orig.transform_camera_to_frame.translation,orig.transform_camera_to_frame.rotation)
+                # then to aligned map
+                cm = self.transform_cloud(cc,tls,rot)
+                transformed_clusters[orig.scene_id].append([cluster.cluster_id,cm])
+
+        return transformed_clusters
 
     def register_views(self,observations,merge_and_write=False):
         seg_clouds = []

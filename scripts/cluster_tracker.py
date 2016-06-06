@@ -17,7 +17,7 @@ import tf
 import PyKDL
 import tf2_ros
 import geometry_msgs.msg
-from cluster_tracking_strategies import NaiveClusterTrackingStrategy, VotingBasedClusterTrackingStrategy
+from cluster_tracking_strategies import *
 from tf import transformations
 import uuid
 import random
@@ -25,27 +25,15 @@ import image_geometry
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
 import base64
-from roi_filter import ROIFilter
-
+#from roi_filter import ROIFilter
+from view_registration import ViewAlignmentManager
+import python_pcd
+import pcl
+from bham_seg import Segmentation
 
 class BBox():
     """ Bounding box of an object with getter functions.
     """
-    def __init__(self, bbox):
-        # Calc x_min and x_max for obj1
-        x_sorted = sorted(bbox, key=itemgetter(0))
-        self.x_min = x_sorted[0][0]
-        self.x_max = x_sorted[7][0]
-
-        # Calc y_min and y_max for obj
-        y_sorted = sorted(bbox, key=itemgetter(1))
-        self.y_min = y_sorted[0][1]
-        self.y_max = y_sorted[7][1]
-
-        # Calc z_min and z_max for obj
-        z_sorted = sorted(bbox, key=itemgetter(2))
-        self.z_min = z_sorted[0][2]
-        self.z_max = z_sorted[7][2]
 
     def __init__(self, x_min, x_max, y_min, y_max, z_min, z_max):
         self.x_min = x_min
@@ -57,25 +45,6 @@ class BBox():
         self.z_min = z_min
         self.z_max = z_max
 
-    def get_x_min(self):
-        return self.x_min
-
-    def get_x_max(self):
-        return self.x_max
-
-
-    def get_y_min(self):
-        return self.y_min
-
-    def get_y_max(self):
-        return self.y_max
-
-    def get_z_min(self):
-        return self.z_min
-
-    def get_z_max(self):
-        return self.z_max
-
     def contains_point(self,point):
         if (self.x_max >= point[0] and self.x_min <= point[0] and self.y_max >= point[1] and self.y_min <= point[1] and self.z_max >= point[2] and self.z_min <= point[2]):
             return True
@@ -83,21 +52,6 @@ class BBox():
 
     def contains_pointstamped(self,point):
         if (self.x_max >= point.x and self.x_min <= point.x and self.y_max >= point.y and self.y_min <= point.y and self.z_max >= point.z and self.z_min <= point.z):
-            return True
-        return False
-
-    def is_colliding(self,ext_bb):
-        x_min = self.get_x_min()
-        x_max = self.get_x_max()
-        y_min = self.get_y_min()
-        y_max = self.get_y_max()
-
-        e_x_min = ext_bb.get_x_min()
-        e_x_max = ext_bb.get_x_max()
-        e_y_min = ext_bb.get_y_min()
-        e_y_max = ext_bb.get_y_max()
-
-        if (x_max >= e_x_min and x_min <= e_x_max and y_max >= e_y_min and y_min <= e_y_max):
             return True
         return False
 
@@ -112,6 +66,8 @@ class SegmentedCluster:
         self.local_centroid = None
         self.bbox = None
         self.assigned = False
+        self.label = None
+
 
 
     def reset_assignment(self):
@@ -183,6 +139,7 @@ class SegmentedScene:
         tr = Transform()
         tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
         tr.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
+        self.transform_frame_to_map = tr
 
         tr_s = TransformStamped()
         tr_s.header = std_msgs.msg.Header()
@@ -191,40 +148,19 @@ class SegmentedScene:
         tr_s.child_frame_id = self.child_camera_frame
         tr_s.transform = tr
 
-        t_kdl = self.transform_to_kdl(tr_s)
-        points_out = []
-        for p_in in pc2.read_points(cloud):
-            p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
-            points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
-
-        res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
-        return res
-
-    def transform_cloud_to_base(self,cloud):
-        rospy.loginfo("to base")
-
-        t = self.listener.getLatestCommonTime("base_link", self.child_camera_frame)
-        self.listener.waitForTransform("base_link", self.child_camera_frame, t, rospy.Duration(15.0))
-        tr_r = self.listener.lookupTransform("base_link", self.child_camera_frame, t)
-
-        tr = Transform()
-        tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
-        tr.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
-
-        tr_s = TransformStamped()
-        tr_s.header = std_msgs.msg.Header()
-        tr_s.header.stamp = rospy.Time.now()
-        tr_s.header.frame_id = 'base_link'
-        tr_s.child_frame_id = self.child_camera_frame
-        tr_s.transform = tr
 
         t_kdl = self.transform_to_kdl(tr_s)
         points_out = []
-        for p_in in pc2.read_points(cloud):
+        for p_in in pc2.read_points(cloud,field_names=["x","y","z","rgb"]):
             p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
             points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
 
-        res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
+        fil_fields = []
+        for x in cloud.fields:
+            if(x.name in "x" or x.name in "y" or x.name in "z" or x.name in "rgb"):
+                fil_fields.append(x)
+
+        res = pc2.create_cloud(cloud.header, fil_fields, points_out)
         return res
 
     def transform_cloud_to_frame(self,cloud):
@@ -233,6 +169,7 @@ class SegmentedScene:
         t = self.listener.getLatestCommonTime(self.child_camera_frame, self.root_camera_frame)
         self.listener.waitForTransform(self.child_camera_frame, self.root_camera_frame, t, rospy.Duration(5.0))
         tr_r = self.listener.lookupTransform(self.child_camera_frame, self.root_camera_frame, t)
+        self.transform_to_camera = tr_r
 
         tr = Transform()
         tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
@@ -244,14 +181,20 @@ class SegmentedScene:
         tr_s.header.frame_id = self.child_camera_frame
         tr_s.child_frame_id = self.root_camera_frame
         tr_s.transform = tr
+        self.transform_camera_to_frame = tr
 
         t_kdl = self.transform_to_kdl(tr_s)
         points_out = []
-        for p_in in pc2.read_points(cloud):
+        for p_in in pc2.read_points(cloud,field_names=["x","y","z","rgb"]):
             p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
             points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
 
-        res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
+        fil_fields = []
+        for x in cloud.fields:
+            if(x.name in "x" or x.name in "y" or x.name in "z" or x.name in "rgb"):
+                fil_fields.append(x)
+
+        res = pc2.create_cloud(cloud.header, fil_fields, points_out)
         return res
 
     def get_camera_info_topic(self):
@@ -291,8 +234,21 @@ class SegmentedScene:
         if not(x - 1 < 0):
             points.append([y,x-1])
 
-        if not(y + 1 > 640):
+        if not(x + 1 > 640):
             points.append([y,x+1])
+
+        if not(y - 1 < 0) and not(x - 1 < 0):
+            points.append([y-1,x-1])
+
+        if not(y + 1 > 480) and not(x - 1 < 0):
+            points.append([y+1,x-1])
+
+        if not(y - 1 < 0) and not(x + 1 > 0):
+            points.append([y-1,x+1])
+
+        if not(y + 1 > 480) and not(x + 1 < 0):
+            points.append([y+1,x+1])
+
 
         return points
 
@@ -305,12 +261,17 @@ class SegmentedScene:
         if("head_xtion_rgb_optical_frame" in str(cloud.header.frame_id)):
             rospy.loginfo("found head_xtion_rgb_optical_frame")
             self.root_camera_frame = cloud.header.frame_id
-            self.child_camera_frame = "head_xtion_rgb_frame"
+            self.child_camera_frame = "base_link"
 
         if("head_xtion_depth_optical_frame" in str(cloud.header.frame_id)):
             rospy.loginfo("found head_xtion_depth_optical_frame")
             self.root_camera_frame = cloud.header.frame_id
-            self.child_camera_frame = "head_xtion_depth_frame"
+            self.child_camera_frame = "base_link"
+
+        # fixes issue when loading files from chris' pcd loader
+        if(cloud.header.frame_id in "/pcd_cloud"):
+            self.root_camera_frame = "/head_xtion_depth_optical_frame"
+            self.child_camera_frame = "/base_link"
 
         rospy.loginfo("frames are:")
         rospy.loginfo(self.root_camera_frame)
@@ -319,7 +280,9 @@ class SegmentedScene:
 
     def __init__(self,indices,input_scene_cloud,roi_filter):
         self.set_frames(input_scene_cloud)
+        self.scene_id = str(uuid.uuid4())
         self.clean_setup = False
+        self.cluster_map = {}
         #rospy.loginfo("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
         self.num_clusters = len(indices.clusters_indices)
         self.input_scene_cloud = input_scene_cloud
@@ -330,11 +293,10 @@ class SegmentedScene:
 
         self.camera_msg = self.get_camera_info_topic()
         if(self.camera_msg is None):
-            rospy.logerr("Unable to locate camera_info topic")
+            rospy.logerr("Unable to locate camera_info topic. This is fatal.")
             rospy.logerr("Exiting")
             return
 
-        #rospy.loginfo("waiting for transform")
         try:
             t = self.listener.getLatestCommonTime("map", self.root_camera_frame)
             self.listener.waitForTransform("map", self.root_camera_frame, t, rospy.Duration(10.0))
@@ -368,7 +330,6 @@ class SegmentedScene:
 
         # rospy.loginfo("loading clusters")
         rospy.loginfo("Located: %d candidate clusters", len(indices.clusters_indices))
-        rospy.loginfo("ROI Filtering is ON")
 
         for root_cluster in indices.clusters_indices:
             map_points_data = []
@@ -376,6 +337,7 @@ class SegmentedScene:
             rospy.loginfo("--- CLUSTER ----")
 
             cid = str(uuid.uuid4()) # str so we can later link it to a soma2 object, which indexes by string
+            rospy.loginfo("id: " + cid)
             #rospy.loginfo("randomly assigned temporary cid: " + str(cid))
             cur_cluster = SegmentedCluster(cid,root_cluster)
             #raw = []
@@ -445,7 +407,7 @@ class SegmentedScene:
                 # this is technically a bit hacky and slow, but on the scale we're doing it
                 # it really doesn't matter
                 for p in self.get_moore_neighbourhood([rgb_y,rgb_x]):
-                    rgb_mask[p[0],p[1]] = [255,255,255]
+                    rgb_mask[int(p[0]),int(p[1])] = [255,255,255]
 
                 if(rgb_x < rgb_min_x):
                     rgb_min_x = rgb_x
@@ -511,8 +473,8 @@ class SegmentedScene:
                     max_z = pt_s.point.z
 
             #rospy.loginfo("RGB bbox: [" + str(rgb_min_x) + "," + str(rgb_min_y) + "," +str(rgb_max_x) + "," + str(rgb_max_y) + "]")
-            #rospy.loginfo("3d bbox (map): [" + str(min_x) + "," + str(min_y) + "," +str(min_z) + "," + str(max_x) + "," + str(max_y) + ","+str(max_z)+"]")
-            #rospy.loginfo("3d bbox (local): [" + str(local_min_x) + "," + str(local_min_y) + "," +str(local_min_z) + "," + str(local_max_x) + "," + str(local_max_y) + ","+str(local_max_z)+"]")
+            rospy.loginfo("3d bbox (map): [" + str(min_x) + "," + str(min_y) + "," +str(min_z) + "," + str(max_x) + "," + str(max_y) + ","+str(max_z)+"]")
+            rospy.loginfo("3d bbox (local): [" + str(local_min_x) + "," + str(local_min_y) + "," +str(local_min_z) + "," + str(local_max_x) + "," + str(local_max_y) + ","+str(local_max_z)+"]")
 
             x /= len(cur_cluster.data)
             y /= len(cur_cluster.data)
@@ -535,19 +497,24 @@ class SegmentedScene:
             cur_cluster.map_centroid = np.array((ps_t.point.x ,ps_t.point.y, ps_t.point.z))
 
             # filter based on SOMA ROI info #
-            if(roi_filter.point_in_roi([ps_t.point.x,ps_t.point.y])):
-                rospy.logwarn("This object is within a SOMA ROI, continuing processing")
-            else:
-                rospy.logwarn("This object is NOT within a SOMA ROI, not processing")
-                continue
+            if(roi_filter):
+                if(roi_filter.point_in_roi([ps_t.point.x,ps_t.point.y])):
+                    rospy.logwarn("This object is within a SOMA ROI, continuing processing")
+                else:
+                    rospy.logwarn("This object is NOT within a SOMA ROI, not processing")
+                    continue
 
             cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
 
+            fil_fields = []
+            for x in input_scene_cloud.fields:
+                if(x.name in "x" or x.name in "y" or x.name in "z" or x.name in "rgb"):
+                    fil_fields.append(x)
 
             header_cam = std_msgs.msg.Header()
             header_cam.stamp = rospy.Time.now()
             header_cam.frame_id = self.root_camera_frame
-            cur_cluster.segmented_pc_camframe = pc2.create_cloud(header_cam, input_scene_cloud.fields, cluster_camframe)
+            cur_cluster.segmented_pc_camframe = pc2.create_cloud(header_cam, fil_fields, cluster_camframe)
 
 
 
@@ -559,7 +526,7 @@ class SegmentedScene:
 
             #rospy.loginfo("centroid:")
             # TODO: MAP CENTROID DOESN'T WORK ANY MORE
-            #rospy.loginfo("map centroid:" + str(cur_cluster.map_centroid))
+            rospy.loginfo("map centroid:" + str(cur_cluster.map_centroid))
             #rospy.loginfo("local centroid:" + str(cur_cluster.local_centroid))
 
 
@@ -615,7 +582,7 @@ class SegmentedScene:
             if(x_start < 0):
                 x_start = 0
 
-            cur_cluster.cv_image_cropped = cv_image[y_start:y_end, x_start:x_end]
+            cur_cluster.cv_image_cropped = cv_image[int(y_start):int(y_end), int(x_start):int(x_end)]
 
             cur_cluster.cropped_image = bridge.cv2_to_imgmsg(cur_cluster.cv_image_cropped, encoding="bgr8")
 
@@ -629,6 +596,7 @@ class SegmentedScene:
             #rospy.loginfo("img bbox: " + str(cur_cluster.img_bbox))
 
             bbox = BBox(min_x,max_x,min_y,max_y,min_z,max_z)
+            bbox_local = BBox(local_min_x,local_max_x,local_min_y,local_max_y,local_min_z,local_max_z)
 
             x_range = max_x-min_x
             y_range = max_y-min_y
@@ -642,12 +610,12 @@ class SegmentedScene:
             outer_core_bbox = BBox(min_x+x_mod,max_x-x_mod,min_y+y_mod,max_y-y_mod,min_z+z_mod,max_z-z_mod)
 
             cur_cluster.bbox = bbox
+            cur_cluster.bbox_local = bbox_local
             cur_cluster.outer_core_bbox = outer_core_bbox
 
-            # rospy.loginfo("bbox: [" + str(bbox.x_min) + "," + str(bbox.y_min) + "," +str(bbox.z_min) + "," + str(bbox.x_max) + "," + str(bbox.y_max) + ","+str(bbox.z_max)+"]")
 
-        #    rospy.loginfo("is centre point in bbox? " + str(cur_cluster.bbox.contains_point(cur_cluster.map_centroid)))
             self.cluster_list.append(cur_cluster)
+            self.cluster_map[cur_cluster.cluster_id] = cur_cluster
             self.clean_setup = True
 
 
@@ -660,12 +628,16 @@ class SOMAClusterTracker:
         self.segmentation_service = "/pcl_segmentation_service/pcl_segmentation"
         self.cur_scene = None
         self.prev_scene = None
+        self.root_scene = None
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
-        self.roi_filter = ROIFilter()
+        self.roi_filter = None
+        self.view_alignment_manager = ViewAlignmentManager()
+        self.segmenter = Segmentation(500,50000,2.5,False)
 
     def reset(self):
         self.cur_scene = None
         self.prev_scene = None
+        self.root_scene = None
 
     def add_unsegmented_scene(self,data):
         # takes in a SegmentedScene
@@ -677,17 +649,34 @@ class SOMAClusterTracker:
         rospy.loginfo("segmentation done")
 
         try:
-            out = self.segmentation.seg_service(cloud=data)
+            #out = self.segmentation.seg_service(cloud=data)
+            rgb,indices = self.segmenter.segment(data)
+            return True
 
             new_scene = SegmentedScene(out,data,self.roi_filter)
+
+            # store the root scene so we can align future clouds in reference to it
+            if(self.root_scene is None):
+                self.root_scene = new_scene
 
             rospy.loginfo("new scene added, with " + str(new_scene.num_clusters) + " clusters")
             self.cur_scene = new_scene
 
             if(self.prev_scene):
                 rospy.loginfo("we have a previous observation to compare to")
-                tracker = VotingBasedClusterTrackingStrategy()
-                tracker.track(self.cur_scene,self.prev_scene)
+                print("")
+                print("TRACKING USING ALIGNED VOXEL VOTING METHOD")
+                tracker = VoxelViewAlignedVotingBasedClusterTrackingStrategy()
+
+                tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
+                #print("\n")
+                print("TRACKING USING ALIGNED VOTING METHOD")
+                tracker = ViewAlignedVotingBasedClusterTrackingStrategy()
+                tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
+                #print("\n")
+                #print("TRACKING USING VOXEL VOTING METHOD")
+                #tracker = VoxelVotingBasedClusterTrackingStrategy()
+                #tracker.track(self.cur_scene,self.prev_scene)
             else:
                 rospy.loginfo("no previous scene to compare to, skipping merging step, all clusters regarded as new")
         except rospy.ServiceException, e:
@@ -758,4 +747,20 @@ class SegmentationWrapper:
 
 
 if __name__ == '__main__':
+    rospy.init_node('CT_TEST_NODE', anonymous = True)
     tracker = SOMAClusterTracker()
+
+    #if(False):
+    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    #cloud = python_pcd.read_pcd("tsc1.pcd")
+    #cloud = cloud[0]
+    tracker.add_unsegmented_scene(cloud)
+    if(False):
+        invar = raw_input('press key to take view')
+        cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+        tracker.add_unsegmented_scene(cloud)
+        invar = raw_input('press key to take view')
+        cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+        tracker.add_unsegmented_scene(cloud)
+
+    rospy.spin()
