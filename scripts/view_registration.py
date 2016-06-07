@@ -27,8 +27,8 @@ class ViewAlignmentManager:
         #rospy.init_node('world_modeling_view_alignment', anonymous = True)
         rospy.loginfo("---created view alignment manager --")
         rospy.loginfo("waiting for view alignment service additional_view_registration_server from strands_3d_mapping")
-        rospy.wait_for_service('additional_view_registration_server')
-        self.reg_serv = rospy.ServiceProxy('additional_view_registration_server',AdditionalViewRegistrationService)
+        rospy.wait_for_service('/additional_view_registration_server')
+        self.reg_serv = rospy.ServiceProxy('/additional_view_registration_server',AdditionalViewRegistrationService)
         rospy.loginfo("got it")
 
 
