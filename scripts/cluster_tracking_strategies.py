@@ -5,12 +5,34 @@ import rospy
 import numpy as np
 from view_registration import ViewAlignmentManager
 import Queue as q
-from cluster_tracker import BBox
 import sensor_msgs.point_cloud2 as pc2
 from sensor_msgs.msg import PointCloud2, PointField
 
 import pcl
 
+class BBox():
+    """ Bounding box of an object with getter functions.
+    """
+
+    def __init__(self, x_min, x_max, y_min, y_max, z_min, z_max):
+        self.x_min = x_min
+        self.x_max = x_max
+
+        self.y_min = y_min
+        self.y_max = y_max
+
+        self.z_min = z_min
+        self.z_max = z_max
+
+    def contains_point(self,point):
+        if (self.x_max >= point[0] and self.x_min <= point[0] and self.y_max >= point[1] and self.y_min <= point[1] and self.z_max >= point[2] and self.z_min <= point[2]):
+            return True
+        return False
+
+    def contains_pointstamped(self,point):
+        if (self.x_max >= point.x and self.x_min <= point.x and self.y_max >= point.y and self.y_min <= point.y and self.z_max >= point.z and self.z_min <= point.z):
+            return True
+        return False
 
 class ClusterTrackingStrategy:
     def __init__(self):

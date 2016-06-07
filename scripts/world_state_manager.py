@@ -504,8 +504,8 @@ class WorldStateManager:
                 cur_cluster._point_cloud = mso
                 cur_cluster.view_episode_id = self.view_episode_id
 
-                cur_cluster.label = label.one.label
-                cur_cluster.label_confidence = label.one.confidence
+                cur_cluster.label = cur_scene_cluster.label
+                cur_cluster.label_confidence = cur_scene_cluster.confidence
 
                 #cloud_observation.add_message(cur_scene_cluster.img_bbox,"image_bounding_box")
                 #cloud_observation.add_message(cur_scene_cluster.img_centroid,"image_centroid")

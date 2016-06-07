@@ -284,9 +284,11 @@ class SegmentedScene:
         self.clean_setup = False
         self.cluster_map = {}
         #rospy.loginfo("\nthis cloud has " + str(len(indices.clusters_indices)) + " clusters")
-        self.num_clusters = len(indices.clusters_indices)
+        self.num_clusters = len(indices)
         self.input_scene_cloud = input_scene_cloud
         self.listener = tf.TransformListener()
+        self.label = "unknown"
+        self.confidence = 0.0
 
         # let the listener grab a few frames of tf
         rospy.sleep(1)
@@ -329,9 +331,9 @@ class SegmentedScene:
         map_points_int_data = list(map_points)
 
         # rospy.loginfo("loading clusters")
-        rospy.loginfo("Located: %d candidate clusters", len(indices.clusters_indices))
+        rospy.loginfo("Located: %d candidate clusters", len(indices))
 
-        for root_cluster in indices.clusters_indices:
+        for root_cluster in indices:
             map_points_data = []
             rgb_mask = np.zeros(cv_image.shape,np.uint8)
             rospy.loginfo("--- CLUSTER ----")
@@ -341,7 +343,7 @@ class SegmentedScene:
             #rospy.loginfo("randomly assigned temporary cid: " + str(cid))
             cur_cluster = SegmentedCluster(cid,root_cluster)
             #raw = []
-            for idx in root_cluster.data:
+            for idx in root_cluster:
                 cur_cluster.data.append(int_data[idx])
                 map_points_data.append(map_points_int_data[idx])
 
@@ -632,7 +634,7 @@ class SOMAClusterTracker:
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
         self.roi_filter = ROIFilter()
         self.view_alignment_manager = ViewAlignmentManager()
-        self.segmenter = Segmentation(500,50000,2.5,False)
+        self.segmenter = Segmentation(1000,50000,2.5,-0.4,0.06,False)
 
     def reset(self):
         self.cur_scene = None
@@ -645,15 +647,13 @@ class SOMAClusterTracker:
         # segment the pc
         rospy.loginfo("waiting for segmentation service")
         rospy.loginfo("segmenting (may take a second)")
-        rospy.wait_for_service(self.segmentation_service)
+        #rospy.wait_for_service(self.segmentation_service)
         rospy.loginfo("segmentation done")
 
         try:
-            #out = self.segmentation.seg_service(cloud=data)
             rgb,indices = self.segmenter.segment(data)
-            return True
 
-            new_scene = SegmentedScene(out,data,self.roi_filter)
+            new_scene = SegmentedScene(indices,rgb,self.roi_filter)
 
             # store the root scene so we can align future clouds in reference to it
             if(self.root_scene is None):

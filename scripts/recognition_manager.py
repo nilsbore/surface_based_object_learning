@@ -136,13 +136,15 @@ class ObjectRecognitionManager:
                 best = scores[s]
                 s_max = scores[s].score
 
-        return best
+        return best.one.label,best.one.confidence
 
 
     def assign_labels(self,scene):
         for cluster in scene.cluster_list:
             rospy.loginfo("Processing Cluster " + cluster.cluster_id)
-            cluster.label = self.get_most_likely_label(cluster)
+            label,confidence = self.get_most_likely_label(cluster)
+            cluster.label = label
+            cluster.confidence = confidence
 
     def recognise_scene(self,input_cloud):
         if(self.setup_clean is False):
