@@ -121,17 +121,27 @@ class ViewAlignmentManager:
     def register_scenes(self,cur_scene,prev_scene,root_scene):
         # transform these scenes to the camera frames
         self.set_frames(cur_scene.input_scene_cloud)
+
+        rospy.loginfo("running transforms")
         cam_cur = self.transform_cloud(cur_scene.input_scene_cloud,cur_scene.transform_camera_to_frame.translation,cur_scene.transform_camera_to_frame.rotation)
         cam_prev = self.transform_cloud(prev_scene.input_scene_cloud,prev_scene.transform_camera_to_frame.translation,prev_scene.transform_camera_to_frame.rotation)
         cam_root = self.transform_cloud(root_scene.input_scene_cloud,root_scene.transform_camera_to_frame.translation,root_scene.transform_camera_to_frame.rotation)
         bases = [root_scene,prev_scene,cur_scene]
         scenes = [cam_root,cam_prev,cam_cur]
+        rospy.loginfo("done")
 
         map_root_t = root_scene.transform_frame_to_map
         map_prev_t = prev_scene.transform_frame_to_map
         map_cur_t = cur_scene.transform_frame_to_map
         # align these clouds
+        rospy.loginfo("calling alignment service")
+        rospy.loginfo("scenes: " + str(len(scenes)))
+
+        for k in scenes:
+            rospy.loginfo(k.scene_id)
+
         response = self.reg_serv(additional_views=scenes,additional_views_odometry_transforms=[map_root_t,map_prev_t,map_cur_t])
+        rospy.loginfo("done")
         #print(response)
         view_trans = response.additional_view_transforms
         transformed_clusters = {}

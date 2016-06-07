@@ -618,8 +618,8 @@ class SegmentedScene:
 
             self.cluster_list.append(cur_cluster)
             self.cluster_map[cur_cluster.cluster_id] = cur_cluster
-            self.clean_setup = True
 
+        self.clean_setup = True
 
 
 class SOMAClusterTracker:
@@ -645,14 +645,10 @@ class SOMAClusterTracker:
         # takes in a SegmentedScene
         rospy.loginfo("\n\n--- Beginning Interpretation of Scene --")
         # segment the pc
-        rospy.loginfo("waiting for segmentation service")
-        rospy.loginfo("segmenting (may take a second)")
-        #rospy.wait_for_service(self.segmentation_service)
-        rospy.loginfo("segmentation done")
-
         try:
+            rospy.loginfo("segmenting (may take a second)")
             rgb,indices = self.segmenter.segment(data)
-
+            rospy.loginfo("segmentation done")
             new_scene = SegmentedScene(indices,rgb,self.roi_filter)
 
             # store the root scene so we can align future clouds in reference to it
@@ -663,20 +659,11 @@ class SOMAClusterTracker:
             self.cur_scene = new_scene
 
             if(self.prev_scene):
-                rospy.loginfo("we have a previous observation to compare to")
-                print("")
-                print("TRACKING USING ALIGNED VOXEL VOTING METHOD")
-                tracker = VoxelViewAlignedVotingBasedClusterTrackingStrategy()
-
-                tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
-                #print("\n")
-                print("TRACKING USING ALIGNED VOTING METHOD")
-                tracker = ViewAlignedVotingBasedClusterTrackingStrategy()
-                tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
-                #print("\n")
-                #print("TRACKING USING VOXEL VOTING METHOD")
-                #tracker = VoxelVotingBasedClusterTrackingStrategy()
-                #tracker.track(self.cur_scene,self.prev_scene)
+                if(len(self.cur_scene.cluster_list) > 0 and len(self.prev_scene.cluster_list > 0)):
+                    rospy.loginfo("we have a previous observation to compare to")
+                    print("")
+                    tracker = VoxelViewAlignedVotingBasedClusterTrackingStrategy()
+                    tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
             else:
                 rospy.loginfo("no previous scene to compare to, skipping merging step, all clusters regarded as new")
         except rospy.ServiceException, e:

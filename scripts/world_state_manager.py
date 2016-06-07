@@ -156,6 +156,7 @@ class WorldStateManager:
 
     def end_obs(self,req):
         rospy.loginfo("-- received signal to terminate sequence of observations --")
+        rospy.loginfo("")
         self.do_postprocessing()
         return TriggerResponse(True,"Observations Ending: Assuming all previous observations were from the same sequence.")
 
@@ -262,41 +263,17 @@ class WorldStateManager:
                 if(scene.clean_setup is True):
                     scene.waypoint = req.waypoint
                     rospy.loginfo("---- Running Object Recognition ----")
-                    self.recog_manager.recognise_scene(req.input)
-                    self.recog_manager.assign_labels(scene)
+                    if(self.recog_manager):
+                        self.recog_manager.recognise_scene(req.input)
+                        self.recog_manager.assign_labels(scene)
+                    else:
+                        rospy.logwarn("Object recognition service not found, try restarting this node?")
 
                     self.assign_clusters(scene,self.cluster_tracker.prev_scene)
                     self.pending_obs.append(scene)
 
                     rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
 
-                    #rospy.loginfo("Header of cloud: ")
-                    #rospy.loginfo(req.input.header)
-
-                #    recog_out = self.recog_service(cloud=req.input)
-
-                #    rospy.loginfo("---- Printing Results of Object Recognition ----")
-
-                #    labels = recog_out.ids
-                #    confidences = recog_out.confidence
-
-                #    print("LABELS: ")
-                #    print(labels)
-
-                #    print("CONFIDENCES: ")
-
-
-                #    print(confidences)
-
-
-
-                #    fn = str(uuid.uuid4())
-
-                #    print("WRITING SCENE TO FILE: " + fn)
-
-                #    python_pcd.write_pcd("  fn+".pcd", req.input)
-
-                    rospy.sleep(15)
                     return WorldUpdateResponse(True,self.cur_view_soma_ids)
                 else:
                     rospy.loginfo("Error in processing scene")
@@ -310,6 +287,10 @@ class WorldStateManager:
 
     def do_postprocessing(self):
         rospy.loginfo("-- beginning post-processing, attempting view alignment and object label updates -- ")
+
+        if(len(self.cur_sequence_obj_ids) == 0):
+            rospy.loginfo("-- no segments found in this scene, or if they were they were filtered out by the SOMA region or height filters ")
+
         for object_id in self.cur_sequence_obj_ids:
             soma_objects = self.get_soma_objects_with_id(object_id)
             rospy.loginfo("attempting to process object: " + str(object_id))
@@ -361,15 +342,15 @@ class WorldStateManager:
             else:
                 rospy.loginfo("not running view alignment, only one view")
 
-        rospy.loginfo("attempting to update object's recognition label")
+            rospy.loginfo("attempting to update object's recognition label")
 
-        try:
-            soma_objects.objects[0].type = world_object.label
-            self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
-            rospy.loginfo("done! this object recognised as a " + world_object.label + " with confidence: " + str(world_object.label_confidence))
-        except Exception,e:
-            rospy.logerr("Problem updating SOMA object label.")
-            rospy.logerr(e)
+            try:
+                soma_objects.objects[0].type = world_object.label
+                self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
+                rospy.loginfo("done! this object recognised as a " + world_object.label + " with confidence: " + str(world_object.label_confidence))
+            except Exception,e:
+                rospy.logerr("Problem updating SOMA object label.")
+                rospy.logerr(e)
 
         rospy.loginfo("post-processing complete")
 

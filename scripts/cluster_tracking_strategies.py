@@ -197,6 +197,9 @@ class VoxelViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy
         rospy.loginfo("VoxelViewAlignedVotingBasedClusterTrackingStrategy")
         rospy.loginfo(""+str(len(cur_scene.cluster_list)) + " clusters in this scene")
         rospy.loginfo(""+str(len(prev_scene.cluster_list)) + " clusters in previous scene")
+        if(cur_scene is None or prev_scene is None or root_scene is None):
+            rospy.logerr("An input scene is null, not tracking")
+            return
 
         # set all clusters to be unassigned
         cur_scene.reset_cluster_assignments()
