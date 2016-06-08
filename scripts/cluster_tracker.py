@@ -634,7 +634,7 @@ class SOMAClusterTracker:
         self.segmentation = SegmentationWrapper(self,self.segmentation_service)
         self.roi_filter = ROIFilter()
         self.view_alignment_manager = ViewAlignmentManager()
-        self.segmenter = Segmentation(1000,50000,2.5,-0.4,0.06,False)
+        self.segmenter = Segmentation()
 
     def reset(self):
         self.cur_scene = None
