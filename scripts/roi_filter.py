@@ -86,7 +86,7 @@ class ROIFilter:
         for polygon in self.soma_polygons:
             if(polygon.contains(point)):
                 return True
-        return True
+        return False
 
 
 if __name__ == '__main__':
