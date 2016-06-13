@@ -67,6 +67,7 @@ class SegmentedCluster:
         self.bbox = None
         self.assigned = False
         self.label = None
+        self.confidence = 0.0
 
 
 
@@ -278,8 +279,9 @@ class SegmentedScene:
         rospy.loginfo(self.child_camera_frame)
 
 
-    def __init__(self,indices,input_scene_cloud,roi_filter):
+    def __init__(self,indices,input_scene_cloud,unfiltered_cloud,roi_filter):
         self.set_frames(input_scene_cloud)
+        self.unfiltered_cloud = unfiltered_cloud
         self.scene_id = str(uuid.uuid4())
         self.clean_setup = False
         self.cluster_map = {}
@@ -650,7 +652,7 @@ class SOMAClusterTracker:
             rospy.loginfo("segmenting (may take a second)")
             rgb,indices = self.segmenter.segment(data)
             rospy.loginfo("segmentation done")
-            new_scene = SegmentedScene(indices,rgb,self.roi_filter)
+            new_scene = SegmentedScene(indices,rgb,data,self.roi_filter)
 
             # store the root scene so we can align future clouds in reference to it
             if(self.root_scene is None):
@@ -746,12 +748,12 @@ if __name__ == '__main__':
     #cloud = python_pcd.read_pcd("tsc1.pcd")
     #cloud = cloud[0]
     tracker.add_unsegmented_scene(cloud)
-    if(False):
-        invar = raw_input('press key to take view')
-        cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
-        tracker.add_unsegmented_scene(cloud)
-        invar = raw_input('press key to take view')
-        cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
-        tracker.add_unsegmented_scene(cloud)
+
+    invar = raw_input('press key to take view')
+    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    tracker.add_unsegmented_scene(cloud)
+    invar = raw_input('press key to take view')
+    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    tracker.add_unsegmented_scene(cloud)
 
     rospy.spin()

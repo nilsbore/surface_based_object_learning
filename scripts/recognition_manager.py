@@ -148,6 +148,7 @@ class ObjectRecognitionManager:
         return best.one.label, best.one.confidence
 
     def assign_labels(self, scene):
+        rospy.loginfi("Assigning Labels")
         for cluster in scene.cluster_list:
             rospy.loginfo("Processing Cluster " + cluster.cluster_id)
             label, confidence = self.get_most_likely_label(cluster)
@@ -158,7 +159,7 @@ class ObjectRecognitionManager:
         if(self.setup_clean is False):
             rospy.logwarn(
                 "*** World_state_manager does not have recognition service")
-            return
+            return False
         rospy.loginfo("--- running object recognition ---")
         # run recogniser on input cloud
         self.frame = input_cloud.header.frame_id
@@ -196,6 +197,7 @@ class ObjectRecognitionManager:
                           str(r.confidence) + " confidence")
 
         rospy.loginfo("--- recognition complete ---")
+        return True
 
 
 if __name__ == '__main__':

@@ -107,7 +107,7 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
         # gives us: transform. apply this to the cluster clouds
         # recalculate bbox and points from this
         aligned_clusters = view_alignment_manager.register_scenes(cur_scene,prev_scene,root_scene)
-        print("done aligning")
+        rospy.loginfo("TRACKER: done aligning")
 
 
         c_max = len(cur_scene.cluster_list)
@@ -125,7 +125,7 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
 
                 for x in aligned_clusters[prev_scene.scene_id]:
                     if x[0] == prev_cluster.cluster_id:
-                        #print("got prev aligned")
+                        #rospy.loginfo("TRACKER: got prev aligned")
                         prev_aligned = x[1]
                         break
 
@@ -135,11 +135,11 @@ class ViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
                 cur_aligned = None
                 for x in aligned_clusters[cur_scene.scene_id]:
                     if x[0] == cur_cluster.cluster_id:
-                        #print("got cur aligned")
+                        #rospy.loginfo("TRACKER: got cur aligned")
                         cur_aligned = x[1]
                         break
 
-                #print("getting points")
+                #rospy.loginfo("TRACKER: getting points")
                 cur_aligned_points = self.get_points(cur_aligned)
                 prev_aligned_points = self.get_points(prev_aligned)
                 cur_aligned_bbox = self.calculate_bbox(cur_aligned)
@@ -209,7 +209,7 @@ class VoxelViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy
         # gives us: transform. apply this to the cluster clouds
         # recalculate bbox and points from this
         aligned_clusters = view_alignment_manager.register_scenes(cur_scene,prev_scene,root_scene)
-        print("done aligning")
+        rospy.loginfo("TRACKER: done aligning")
 
 
         c_max = len(cur_scene.cluster_list)
@@ -263,7 +263,7 @@ class VoxelViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy
                     if cur_octree.is_voxel_occupied_at_point(np.array(vc,dtype=np.float32)):
                         scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
 
-                if(pts != 0):
+                if(pts.size > 0):
                     scores[(cur_cluster,prev_cluster)].score = (float)(scores[(cur_cluster,prev_cluster)].score)/(len(pts))
                 else:
                     scores[(cur_cluster,prev_cluster)].score = 0

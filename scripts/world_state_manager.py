@@ -271,8 +271,9 @@ class WorldStateManager:
 
                     if(self.recog_manager):
                         rospy.loginfo("---- Running Object Recognition ----")
-                        self.recog_manager.recognise_scene(req.input)
-                        self.recog_manager.assign_labels(scene)
+                        recognition = self.recog_manager.recognise_scene(req.input)
+                        if(recognition is True):
+                            self.recog_manager.assign_labels(scene)
                     else:
                         rospy.logwarn("Object recognition service not found, try restarting is the node running?")
 
@@ -350,9 +351,9 @@ class WorldStateManager:
             rospy.loginfo("attempting to update object's recognition label")
 
             try:
-                soma_objects.objects[0].type = world_object.label
+                soma_objects.objects[0].type = str(world_object.label)
                 self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
-                rospy.loginfo("done! this object recognised as a " + world_object.label + " with confidence: " + str(world_object.label_confidence))
+                rospy.loginfo("done! this object recognised as a " + str(world_object.label) + " with confidence: " + str(world_object.label_confidence))
             except Exception,e:
                 rospy.logerr("Problem updating SOMA object label.")
                 rospy.logerr(e)
@@ -445,6 +446,8 @@ class WorldStateManager:
                 if(talk): rospy.loginfo("creating NEW cluster with id: " + str(cur_scene_cluster.cluster_id))
                 cur_cluster = self.world_model.create_object(cur_scene_cluster.cluster_id)
                 cur_cluster._parent = cur_scene.waypoint
+                cur_cluster.label = "unknown"
+                cur_cluster.label_confidence = 0.0
                 self.cur_sequence_obj_ids.append(cur_scene_cluster.cluster_id)
 
             # from here we've either added this as a new object to the scene
@@ -490,8 +493,7 @@ class WorldStateManager:
                 cur_cluster._point_cloud = mso
                 cur_cluster.view_episode_id = self.view_episode_id
 
-                cur_cluster.label = cur_scene_cluster.label
-                cur_cluster.label_confidence = cur_scene_cluster.confidence
+
 
                 #cloud_observation.add_message(cur_scene_cluster.img_bbox,"image_bounding_box")
                 #cloud_observation.add_message(cur_scene_cluster.img_centroid,"image_centroid")
