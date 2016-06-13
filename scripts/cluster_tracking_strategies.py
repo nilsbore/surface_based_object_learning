@@ -231,6 +231,10 @@ class VoxelViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy
             pts = []
             for point in pc2.read_points(cur_aligned):
                 pts.append([point[0],point[1],point[2]])
+
+            if not pts:
+                continue
+
             pts = np.array(pts,dtype=np.float32)
             cur_cld.from_array(pts)
             cur_octree = cur_cld.make_octree(octree_res)
@@ -254,18 +258,15 @@ class VoxelViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy
                 for point in pc2.read_points(prev_aligned):
                     pts.append([point[0],point[1],point[2]])
                 pts = np.array(pts,dtype=np.float32)
-                #pre_cld.from_array(pts)
-                #pre_octree = pre_cld.make_octree(octree_res)
-                #pre_octree.add_points_from_input_cloud()
-
-                #pre_occupied = pre_octree.get_occupied_voxel_centers()
 
                 for vc in pts:
                     if cur_octree.is_voxel_occupied_at_point(np.array(vc,dtype=np.float32)):
                         scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
 
-
-                scores[(cur_cluster,prev_cluster)].score = (float)(scores[(cur_cluster,prev_cluster)].score)/(len(pts))
+                if(pts != 0):
+                    scores[(cur_cluster,prev_cluster)].score = (float)(scores[(cur_cluster,prev_cluster)].score)/(len(pts))
+                else:
+                    scores[(cur_cluster,prev_cluster)].score = 0
 
 
         # assign cluster

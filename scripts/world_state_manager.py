@@ -268,12 +268,13 @@ class WorldStateManager:
                 scene = self.cluster_tracker.add_unsegmented_scene(req.input)
                 if(scene.clean_setup is True):
                     scene.waypoint = req.waypoint
-                    rospy.loginfo("---- Running Object Recognition ----")
+
                     if(self.recog_manager):
+                        rospy.loginfo("---- Running Object Recognition ----")
                         self.recog_manager.recognise_scene(req.input)
                         self.recog_manager.assign_labels(scene)
                     else:
-                        rospy.logwarn("Object recognition service not found, try restarting this node?")
+                        rospy.logwarn("Object recognition service not found, try restarting is the node running?")
 
                     self.assign_clusters(scene,self.cluster_tracker.prev_scene)
                     self.pending_obs.append(scene)

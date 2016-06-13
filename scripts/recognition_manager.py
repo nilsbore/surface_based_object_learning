@@ -74,6 +74,7 @@ class ObjectRecognitionManager:
 
     def __init__(self):
         rospy.loginfo("-- Waiting for Object Recognition Service --")
+        rospy.loginfo("-- 10 SECONDS --")
         self.setup_clean = False
         try:
             rospy.wait_for_service("/recognition_service/sv_recognition", 10)
