@@ -22,25 +22,29 @@ import PyKDL
 import tf2_ros
 from cluster_tracking_strategies import ClusterScore
 
+
 class RecognitionResult:
-    def __init__(self,label,confidence,cloud):
+
+    def __init__(self, label, confidence, cloud):
         self.confidence = confidence
         self.label = label
         self.cloud = cloud
 
+
 class ObjectRecognitionManager:
 
-    def transform_to_kdl(self,t):
-         return PyKDL.Frame(PyKDL.Rotation.Quaternion(t.transform.rotation.x, t.transform.rotation.y,
-                                                      t.transform.rotation.z, t.transform.rotation.w),
-                            PyKDL.Vector(t.transform.translation.x,
-                                         t.transform.translation.y,
-                                         t.transform.translation.z))
+    def transform_to_kdl(self, t):
+        return PyKDL.Frame(PyKDL.Rotation.Quaternion(t.transform.rotation.x, t.transform.rotation.y,
+                                                     t.transform.rotation.z, t.transform.rotation.w),
+                           PyKDL.Vector(t.transform.translation.x,
+                                        t.transform.translation.y,
+                                        t.transform.translation.z))
 
-    def transform_cloud(self,cloud):
+    def transform_cloud(self, cloud):
         t = self.listener.getLatestCommonTime("map", self.frame)
-        self.listener.waitForTransform("map", self.frame, t, rospy.Duration(5.0))
-        t,r = self.listener.lookupTransform("map", self.frame, t)
+        self.listener.waitForTransform(
+            "map", self.frame, t, rospy.Duration(5.0))
+        t, r = self.listener.lookupTransform("map", self.frame, t)
 
         tr = Transform()
         tr.translation.x = t[0]
@@ -63,33 +67,33 @@ class ObjectRecognitionManager:
         points_out = []
         for p_in in pc2.read_points(cloud):
             p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
-            points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
+            points_out.append([p_out[0], p_out[1], p_out[2], p_in[3]])
 
         res = pc2.create_cloud(tr_s.header, cloud.fields, points_out)
         return res
-
-
 
     def __init__(self):
         rospy.loginfo("-- Waiting for Object Recognition Service --")
         self.setup_clean = False
         try:
-            rospy.wait_for_service("/recognition_service/sv_recognition",10)
+            rospy.wait_for_service("/recognition_service/sv_recognition", 10)
             self.setup_clean = True
-        except Exception,e:
-            rospy.logwarn("Could not get singleview recognition service, recognition will not be performed")
+        except Exception, e:
+            rospy.logwarn(
+                "Could not get singleview recognition service, recognition will not be performed")
 
         rospy.loginfo("-- Got recognition service --")
         self.listener = tf.TransformListener()
         # let the listener grab a few frames of tf
         rospy.sleep(1)
-        self.rec_service = rospy.ServiceProxy("/recognition_service/sv_recognition", recognize)
+        self.rec_service = rospy.ServiceProxy(
+            "/recognition_service/sv_recognition", recognize)
 
-
-    def get_most_likely_label(self,cluster):
+    def get_most_likely_label(self, cluster):
         # get the map bbox of cluster
         if(self.setup_clean is False):
-            rospy.logwarn("*** World_state_manager does not have recognition service")
+            rospy.logwarn(
+                "*** World_state_manager does not have recognition service")
             return
 
         bbox = cluster.bbox_local
@@ -101,33 +105,37 @@ class ObjectRecognitionManager:
 
         # test against all the poits in all the result objects
 
-        uk = RecognitionResult("unknown",0.0,None)
+        uk = RecognitionResult("unknown", 0.0, None)
         scores = {}
-        scores[(uk,cluster)] = ClusterScore(uk,cluster,0)
+        scores[(uk, cluster)] = ClusterScore(uk, cluster, 0)
         for result in self.recog_results:
             cloud = result.cloud
-            scores[(result,cluster)] = ClusterScore(result,cluster,0)
+            scores[(result, cluster)] = ClusterScore(result, cluster, 0)
 
             total = 0
             for p in pc2.read_points(cloud):
-                point = [p[0],p[1],p[2]]
-                total+=1
+                point = [p[0], p[1], p[2]]
+                total += 1
                 if(bbox.contains_point(point)):
-                    scores[(result,cluster)].score = scores[(result,cluster)].score+1
-            scores[(result,cluster)].score = (float)(scores[(result,cluster)].score/total)
+                    scores[(result, cluster)].score = scores[
+                        (result, cluster)].score + 1
+            scores[(result, cluster)].score = (float)(
+                scores[(result, cluster)].score / total)
 
         # find the one that matches the best
 
         s_max = -1
-        best = ClusterScore(uk,cluster,0)
+        best = ClusterScore(uk, cluster, 0)
 
         if(cluster.label):
             best = cluster.label
-            rospy.loginfo("setting best to existing label: " + best.one.label + " at confidence: " + str(best.one.confidence))
+            rospy.loginfo("setting best to existing label: " +
+                          best.one.label + " at confidence: " + str(best.one.confidence))
 
         rospy.loginfo("LABEL \t \t \t MATCH SCORE")
         for s in scores:
-            rospy.loginfo(str(scores[s].one.label) + " \t \t \t " + str(scores[s].score))
+            rospy.loginfo(str(scores[s].one.label) +
+                          " \t \t \t " + str(scores[s].score))
 
             if(scores[s].one.confidence < best.one.confidence):
                 continue
@@ -136,19 +144,19 @@ class ObjectRecognitionManager:
                 best = scores[s]
                 s_max = scores[s].score
 
-        return best.one.label,best.one.confidence
+        return best.one.label, best.one.confidence
 
-
-    def assign_labels(self,scene):
+    def assign_labels(self, scene):
         for cluster in scene.cluster_list:
             rospy.loginfo("Processing Cluster " + cluster.cluster_id)
-            label,confidence = self.get_most_likely_label(cluster)
+            label, confidence = self.get_most_likely_label(cluster)
             cluster.label = label
             cluster.confidence = confidence
 
-    def recognise_scene(self,input_cloud):
+    def recognise_scene(self, input_cloud):
         if(self.setup_clean is False):
-            rospy.logwarn("*** World_state_manager does not have recognition service")
+            rospy.logwarn(
+                "*** World_state_manager does not have recognition service")
             return
         rospy.loginfo("--- running object recognition ---")
         # run recogniser on input cloud
@@ -161,37 +169,36 @@ class ObjectRecognitionManager:
 
         tr_r = []
 
-        #try:
+        # try:
         #    rospy.loginfo("Looking for transform to map coordinates")
-            #t = self.listener.getLatestCommonTime("map", self.frame)
-            #self.listener.waitForTransform("map", self.frame, t, rospy.Duration(5.0))
-            #tr_r = self.listener.lookupTransform("map", self.frame, t)
-            #tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
-            #tr.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
-        #except Exception,e:
+        #t = self.listener.getLatestCommonTime("map", self.frame)
+        #self.listener.waitForTransform("map", self.frame, t, rospy.Duration(5.0))
+        #tr_r = self.listener.lookupTransform("map", self.frame, t)
+        #tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
+        #tr.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
+        # except Exception,e:
         #    rospy.logwarn("Failed to get transform to map co-ordinates")
         #rospy.loginfo("Got transform successfully")
 
         rospy.loginfo("Running Recognition")
         try:
             response = self.rec_service(cloud=input_cloud)
-        except Exception,e:
+        except Exception, e:
             rospy.logwarn("Recognition failed")
 
         self.recog_results = []
 
-        for label,conf,cloud in zip(response.ids,response.confidence,response.models_cloud):
-            r = RecognitionResult(label.data,conf,cloud)
+        for label, conf, cloud in zip(response.ids, response.confidence, response.models_cloud):
+            r = RecognitionResult(label.data, conf, cloud)
             self.recog_results.append(r)
-            rospy.loginfo("RESULT: " + str(r.label) + " at " + str(r.confidence) + " confidence")
-
+            rospy.loginfo("RESULT: " + str(r.label) + " at " +
+                          str(r.confidence) + " confidence")
 
         rospy.loginfo("--- recognition complete ---")
 
 
-
 if __name__ == '__main__':
-    rospy.init_node('recog_manager_test', anonymous = True)
+    rospy.init_node('recog_manager_test', anonymous=True)
     r = ObjectRecognitionManager()
     print("done, testing")
     testcl = python_pcd.read_pcd("tests/cloud_00000012.pcd")
@@ -200,7 +207,6 @@ if __name__ == '__main__':
 
     cluster_tracker = SOMAClusterTracker()
     cluster_tracker.add_unsegmented_scene(testcl)
-
 
     r.assign_labels(cluster_tracker.cur_scene)
     r.assign_labels(cluster_tracker.cur_scene)
@@ -211,15 +217,15 @@ if __name__ == '__main__':
 #    z = 0
     #c = 0
 
-    #for cluster in cluster_tracker.cur_scene.cluster_list:
+    # for cluster in cluster_tracker.cur_scene.cluster_list:
     #    print(cluster.map_centroid)
     #    print(cluster.local_centroid)
     ##    python_pcd.write_pcd("seg.pcd",cluster.segmented_pc_mapframe, overwrite=True)
 
-    #for result in r.recog_results:
-        #raw_cloud = pc2.read_points(result.cloud)
-        #raw_cloud = r.transform_cloud(result.cloud)
-        #python_pcd.write_pcd("rec.pcd",result.cloud, overwrite=True)
+    # for result in r.recog_results:
+    #raw_cloud = pc2.read_points(result.cloud)
+    #raw_cloud = r.transform_cloud(result.cloud)
+    #python_pcd.write_pcd("rec.pcd",result.cloud, overwrite=True)
 
     #    for p in pc2.read_points(result.cloud):
     #        x+=p[0]

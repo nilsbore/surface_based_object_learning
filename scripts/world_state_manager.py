@@ -257,8 +257,14 @@ class WorldStateManager:
             rospy.logerr("-- run services and then re-start me --")
             return WorldUpdateResponse(False,self.cur_view_soma_ids)
         else:
-            # store point cloud for later use
+
+            if(req.input is None):
+                rospy.logwarn("-- This point cloud looks empty, is the service being called correctly? ---")
+                rospy.logwarn("-- Stopping Processing ---")
+                return WorldUpdateResponse(False,self.cur_view_soma_ids)
+
             try:
+                rospy.loginfo("---- Segmenting Scene ----")
                 scene = self.cluster_tracker.add_unsegmented_scene(req.input)
                 if(scene.clean_setup is True):
                     scene.waypoint = req.waypoint
@@ -277,10 +283,8 @@ class WorldStateManager:
                     return WorldUpdateResponse(True,self.cur_view_soma_ids)
                 else:
                     rospy.loginfo("Error in processing scene")
-
-
             except Exception,e:
-                rospy.logerr("Unable to segment and proces this scene")
+                rospy.logerr("Unable to segment and process this scene")
                 rospy.logerr(e)
 
             return WorldUpdateResponse(False,self.cur_view_soma_ids)

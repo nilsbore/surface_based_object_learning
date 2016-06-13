@@ -19,26 +19,29 @@ from std_srvs.srv import Trigger
 
 
 if __name__ == '__main__':
-    rospy.init_node('BATCH_TEST', anonymous = False)
-    world_update = rospy.ServiceProxy('update_world_model',WorldUpdate)
-    begin_obs = rospy.ServiceProxy('/begin_observations',Trigger)
-    end_obs = rospy.ServiceProxy('/end_observations',Trigger)
+    rospy.init_node('BATCH_TEST', anonymous=False)
+    world_update = rospy.ServiceProxy('update_world_model', WorldUpdate)
+    begin_obs = rospy.ServiceProxy('/begin_observations', Trigger)
+    end_obs = rospy.ServiceProxy('/end_observations', Trigger)
 
     print("sending begin signal")
     begin_obs()
     views = 0
     while(views < 3):
+
         invar = raw_input('press key to take view')
         print("waiting for pointcloud message")
-        cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+
+        cloud = rospy.wait_for_message(
+            "/head_xtion/depth_registered/points", PointCloud2)
         print("got a pointcloud, calling service")
-        response = world_update(input=cloud,waypoint="WayPoint32")
+        response = world_update(input=cloud, waypoint="WayPoint32")
         print("done")
         print("service response: ")
         print(response)
-        views+=1
+        views += 1
 
     print("sending end signal")
     end_obs()
     print("done")
-    #rospy.spin()
+    # rospy.spin()

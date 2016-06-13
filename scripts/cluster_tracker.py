@@ -289,6 +289,7 @@ class SegmentedScene:
         self.listener = tf.TransformListener()
         self.label = "unknown"
         self.confidence = 0.0
+        self.cluster_list = []
 
         # let the listener grab a few frames of tf
         rospy.sleep(1)
@@ -317,7 +318,7 @@ class SegmentedScene:
         self.raw_cloud = pc2.read_points(input_scene_cloud)
         int_data = list(self.raw_cloud)
 
-        self.cluster_list = []
+
 
         #rospy.loginfo("getting image of scene")
         scene_img = rospy.wait_for_message("/head_xtion/rgb/image_rect_color",  Image, timeout=15.0)
@@ -656,16 +657,19 @@ class SOMAClusterTracker:
                 self.root_scene = new_scene
 
             rospy.loginfo("new scene added, with " + str(new_scene.num_clusters) + " clusters")
+            rospy.loginfo("Applying tracking and filtering to see how many of these are interesting")
+
             self.cur_scene = new_scene
 
-            if(self.prev_scene):
-                if(len(self.cur_scene.cluster_list) > 0 and len(self.prev_scene.cluster_list > 0)):
+            if(self.prev_scene and self.cur_scene and self.root_scene):
+                rospy.loginfo("--- Checking Clusters ---")
+                if(len(self.cur_scene.cluster_list) > 0 and len(self.prev_scene.cluster_list) > 0):
                     rospy.loginfo("we have a previous observation to compare to")
-                    print("")
                     tracker = VoxelViewAlignedVotingBasedClusterTrackingStrategy()
                     tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
             else:
                 rospy.loginfo("no previous scene to compare to, skipping merging step, all clusters regarded as new")
+
         except rospy.ServiceException, e:
              rospy.logerr("Failed Segmentation: ")
              rospy.logerr(e)

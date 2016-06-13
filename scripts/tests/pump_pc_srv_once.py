@@ -21,12 +21,16 @@ if __name__ == '__main__':
     cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
     print("got a pointcloud")
 
-
     print("making proxy")
-    world_update = rospy.ServiceProxy('update_world_model',WorldUpdate)
+    world_update = rospy.ServiceProxy('update_world_model', WorldUpdate)
     #begin_obs = rospy.ServiceProxy('/begin_observations',Trigger)
     #end_obs = rospy.ServiceProxy('/end_observations',Trigger)
     print("done")
+
+    try:
+        print("lol")
+    except Exception, e:
+        print("lorl")
 
     #print("begin obs:")
     #b = begin_obs()
