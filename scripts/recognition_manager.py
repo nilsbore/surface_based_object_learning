@@ -77,7 +77,7 @@ class ObjectRecognitionManager:
         rospy.loginfo("-- 10 SECONDS --")
         self.setup_clean = False
         try:
-            rospy.wait_for_service("/recognition_service/sv_recognition", 10)
+            rospy.wait_for_service("/sv_recognition", 10)
             self.setup_clean = True
         except Exception, e:
             rospy.logwarn(
