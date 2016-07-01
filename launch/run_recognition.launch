@@ -1,3 +1,0 @@
-<launch>
-  <node name="recognition_service" pkg="singleview_object_recognizer" type="recognition_service" args="-m /home/jxy/models/ -z 2.0 --do_sift 1 --do_shot 0 --sift_knn 5 --shot_knn 1" output="screen" respawn="true"/>
-</launch>

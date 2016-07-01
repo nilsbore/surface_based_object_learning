@@ -502,12 +502,12 @@ class SegmentedScene:
             cur_cluster.map_centroid = np.array((ps_t.point.x ,ps_t.point.y, ps_t.point.z))
 
             # filter based on SOMA ROI info #
-            if(roi_filter):
-                if(roi_filter.point_in_roi([ps_t.point.x,ps_t.point.y])):
-                    rospy.logwarn("This object is within a SOMA ROI, continuing processing")
-                else:
-                    rospy.logwarn("This object is NOT within a SOMA ROI, not processing")
-                    continue
+            #if(roi_filter):
+            #    if(roi_filter.point_in_roi([ps_t.point.x,ps_t.point.y])):
+            #        rospy.logwarn("This object is within a SOMA ROI, continuing processing")
+            #    else:
+            #        rospy.logwarn("This object is NOT within a SOMA ROI, not processing")
+            #        continue
 
             cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
 
@@ -520,8 +520,6 @@ class SegmentedScene:
             header_cam.stamp = rospy.Time.now()
             header_cam.frame_id = self.root_camera_frame
             cur_cluster.segmented_pc_camframe = pc2.create_cloud(header_cam, fil_fields, cluster_camframe)
-
-
 
             header_map = std_msgs.msg.Header()
             header_map.stamp = rospy.Time.now()
@@ -634,7 +632,6 @@ class SOMAClusterTracker:
         self.cur_scene = None
         self.prev_scene = None
         self.root_scene = None
-        self.segmentation = SegmentationWrapper(self,self.segmentation_service)
         self.roi_filter = ROIFilter()
         self.view_alignment_manager = ViewAlignmentManager()
         self.segmenter = Segmentation()
@@ -649,8 +646,11 @@ class SOMAClusterTracker:
         rospy.loginfo("\n\n--- Beginning Interpretation of Scene --")
         # segment the pc
         try:
+            rospy.loginfo("filtering this cloud by SOMA ROI")
+            filtered_cloud = self.roi_filter.filter_full_cloud(data)
             rospy.loginfo("segmenting (may take a second)")
-            rgb,indices = self.segmenter.segment(data)
+            rgb,indices = self.segmenter.segment(filtered_cloud)
+
             rospy.loginfo("segmentation done")
             new_scene = SegmentedScene(indices,rgb,data,self.roi_filter)
 
@@ -672,70 +672,13 @@ class SOMAClusterTracker:
             else:
                 rospy.loginfo("no previous scene to compare to, skipping merging step, all clusters regarded as new")
 
-        except rospy.ServiceException, e:
+        except Exception, e:
              rospy.logerr("Failed Segmentation: ")
              rospy.logerr(e)
+             return
 
         self.prev_scene = self.cur_scene
         return new_scene
-
-    def add_segmented_scene(self,new_scene):
-        # takes in a SegmentedScene
-        rospy.loginfo("new scene added, with " + str(new_scene.num_clusters) + " clusters")
-        self.prev_scene = self.cur_scene
-        self.cur_scene = new_scene
-
-        if(self.prev_scene):
-            rospy.loginfo("we have a previous observation to compare to")
-            tracker = NaiveClusterTrackingStrategy()
-            tracker.track(self.cur_scene,self.prev_scene)
-        #else:
-        #     rospy.loginfo("no previous scene to compare to, skipping merging step")
-
-class SegmentationWrapper:
-
-
-    def __init__(self,ct,seg_serv):
-        rospy.loginfo("loading wrapper")
-        self.cluster_tracker = ct
-        self.seg_service = rospy.ServiceProxy(seg_serv, segment)
-
-    def image_callback(self,data):
-        #try:
-            #bridge = CvBridge()
-            #cv_image = bridge.imgmsg_to_cv2(data,desired_encoding="passthrough")
-            #cv.SaveImage("depth_self.camera_msg"+str(data.header.seq)+".png", cv.fromarray(cv_image))
-             print "mask saved!"
-        #except CvBridgeError, e:
-          # print e
-
-    def segment_callback(self,data):
-    #    p = PointCloudTools(data)new_scene = SegmentedScene(out,data,self.segmentation.listener)
-            rospy.loginfo("new scene added, with " + str(new_scene.num_clusters) + " clusters")
-
-            self.prev_scene = self.cur_scene
-            self.cur_scene = new_scene
-
-            if(self.prev_scene):
-                rospy.loginfo("we have a previous observation to compare to")
-                tracker = NaiveClusterTrackingStrategy()
-                tracker.track(self.cur_scene,self.prev_scene)
-            else:
-                 rospy.loginfo("no previous scene to compare to, skipping merging step")
-
-
-    def cloud_callback(self,data):
-        # rospy.loginfo("got cloud:" + str(data.header.seq))
-        try:
-            out = self.seg_service(cloud=data)
-            rospy.loginfo("segmentation complete")
-            p = SegmentedScene(out,data)
-            self.cluster_tracker.add_segmented_scene(p)
-            # rospy.loginfo(out)
-
-        except rospy.ServiceException, e:
-             print "service call failed: %s"%e
-
 
 
 
