@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   message_generation
   sensor_msgs
+  geometry_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -56,6 +57,7 @@ find_package(catkin REQUIRED COMPONENTS
    FILES
     WorldUpdate.srv
     PersonUpdate.srv
+    PointInROI.srv
 #   Service2.srv
  )
 
@@ -71,6 +73,7 @@ find_package(catkin REQUIRED COMPONENTS
    DEPENDENCIES
     std_msgs
     sensor_msgs
+    geometry_msgs
  )
 ###################################
 ## catkin specific configuration ##

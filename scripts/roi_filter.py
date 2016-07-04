@@ -10,7 +10,7 @@ from soma_io.observation import *
 # SOMA2 stuff
 from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
-from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion
+from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion, Point
 import sensor_msgs.point_cloud2 as pc2
 #import python_pcd
 import tf
@@ -22,6 +22,7 @@ from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
 import python_pcd
 from shapely.geometry import MultiPoint
+from world_modeling.srv import PointInROI.srv
 
 
 class ROIFilter:
@@ -35,9 +36,14 @@ class ROIFilter:
         rospy.loginfo("setting up proxy")
         self.soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
         rospy.loginfo("done")
-
         self.gather_rois()
 
+        point_check_service = rospy.Service('/check_point_in_soma_roi',PointInROI,self.roi_check_service_cb)
+        rospy.loginfo("SOMa ROI check service running")
+
+    def roi_check_service_cb(self,req):
+        p = self.ros_point_in_roi(req.input)
+        return PointInROIResponse(p)
 
     def gather_rois(self):
         query = SOMA2QueryObjsRequest()
@@ -77,12 +83,21 @@ class ROIFilter:
 
         return ret
 
+    def ros_point_in_roi(self,point_in):
+        # allows the system to deal with changes made to ROIs online
+        # and avoid having to be reloaded
+        self.gather_rois()
+        point = shapely.geometry.Point(point_in.x,point_in.y)
+        for polygon in self.soma_polygons:
+            if(polygon.contains(point)):
+                return True
+        return False
 
     def point_in_roi(self,point_in):
         # allows the system to deal with changes made to ROIs online
         # and avoid having to be reloaded
         self.gather_rois()
-        point = Point(point_in[0],point_in[1])
+        point = shapely.geometry.Point(point_in[0],point_in[1])
         for polygon in self.soma_polygons:
             if(polygon.contains(point)):
                 return True
@@ -99,7 +114,7 @@ class ROIFilter:
         orig_int_data = list(pc2.read_points(cloud))
 
         for m,o in zip(map_int_data,orig_int_data):
-            point = Point(m[0],m[1])
+            point = shapely.geometry.Point(m[0],m[1])
             for polygon in self.soma_polygons:
                 if(polygon.contains(point)):
                     filtered_points.append(o)
