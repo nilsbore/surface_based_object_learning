@@ -72,7 +72,6 @@ class WorldStateManager:
         #rospy.wait_for_message('/head_xtion/depth_registered/points',PointCloud2)
         #if(talk): rospy.loginfo("got it")
 
-
         rospy.loginfo("setting up services")
         update_world_state = rospy.Service('update_world_model',WorldUpdate,self.object_segment_callback)
         rospy.loginfo("world update service running")
@@ -100,7 +99,6 @@ class WorldStateManager:
         self.recog_manager = ObjectRecognitionManager()
         rospy.loginfo("setting up view alignment manager")
         self.view_alignment_manager = ViewAlignmentManager()
-
 
         self.clean_up_obs()
 
