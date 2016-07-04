@@ -37,7 +37,7 @@ class ROIFilter:
         self.soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
         rospy.loginfo("done")
         self.gather_rois()
-
+        rospy.loginfo("launching SOMa ROI check server")
         point_check_service = rospy.Service('/check_point_in_soma_roi',PointInROI,self.roi_check_service_cb)
         rospy.loginfo("SOMa ROI check service running")
 
