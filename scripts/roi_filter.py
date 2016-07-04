@@ -171,12 +171,12 @@ class ROIFilter:
         return res
 
 if __name__ == '__main__':
-    rospy.loginfo("hi")
+    rospy.init_node('test_roi_filter_', anonymous = True)
+    rospy.loginfo("loading ROI Filter")
     r = ROIFilter()
-
     # get a point cloud
-    pc = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
-    print("got a cloud")
-    mc = r.filter_full_cloud(pc)
+    #pc = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    #print("got a cloud")
+    #mc = r.filter_full_cloud(pc)
 
     #python_pcd.write_pcd("roi_points.pcd", mc, overwrite=True)
