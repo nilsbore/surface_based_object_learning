@@ -77,7 +77,7 @@ class ObjectRecognitionManager:
         rospy.loginfo("-- 10 SECONDS --")
         self.setup_clean = False
         try:
-            rospy.wait_for_service("sv_recognition", 10)
+            rospy.wait_for_service("/recognition_service/sv_recognition", 10)
             self.setup_clean = True
         except Exception, e:
             rospy.logwarn(
@@ -87,7 +87,7 @@ class ObjectRecognitionManager:
         self.listener = tf.TransformListener()
         # let the listener grab a few frames of tf
         rospy.sleep(1)
-        self.rec_service = rospy.ServiceProxy("sv_recognition", recognize)
+        self.rec_service = rospy.ServiceProxy("/recognition_service/sv_recognition", recognize)
 
     def get_most_likely_label(self, cluster):
         # get the map bbox of cluster
