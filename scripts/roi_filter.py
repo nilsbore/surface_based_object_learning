@@ -88,6 +88,7 @@ class ROIFilter:
         # allows the system to deal with changes made to ROIs online
         # and avoid having to be reloaded
         self.gather_rois()
+        rospy.loginfo("Checking: " + str(len(self.soma_polygons)) + " SOMa ROIs")
         point = shapely.geometry.Point(point_in.x,point_in.y)
         for polygon in self.soma_polygons:
             if(polygon.contains(point)):
