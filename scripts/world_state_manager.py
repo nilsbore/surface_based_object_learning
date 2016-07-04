@@ -98,7 +98,22 @@ class WorldStateManager:
         rospy.loginfo("done")
         self.soma_update = rospy.ServiceProxy('soma2/update_object',SOMA2UpdateObject)
 
+<<<<<<< HEAD
         self.recog_manager = ObjectRecognitionManager()
+=======
+        try:
+            rospy.loginfo("getting recognition service")
+            rospy.wait_for_service('/recognition_service/sv_recognition',3)
+            self.recog_service = rospy.ServiceProxy('/recognition_service/sv_recognition',recognize)
+
+            if(self.recog_service):
+                rospy.loginfo("recognition service online")
+            else:
+                rospy.loginfo("no recognition service")
+        except Exception,e:
+            rospy.loginfo("Unable to get object recognition service, continuing but no object recognition will be performed")
+            pass
+>>>>>>> a9a6e97d9b384455a4c7dc1fd18110a5edcd3fff
 
         rospy.loginfo("setting up view alignment manager")
         self.view_alignment_manager = ViewAlignmentManager()
