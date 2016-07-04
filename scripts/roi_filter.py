@@ -174,9 +174,13 @@ if __name__ == '__main__':
     rospy.init_node('test_roi_filter_', anonymous = True)
     rospy.loginfo("loading ROI Filter")
     r = ROIFilter()
-    # get a point cloud
-    #pc = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
-    #print("got a cloud")
-    #mc = r.filter_full_cloud(pc)
 
-    #python_pcd.write_pcd("roi_points.pcd", mc, overwrite=True)
+
+    rospy.loginfo("getting service")
+    point = geometry_msgs.msg.Point()
+    point.x = 10
+    point.y = 10
+    point.z = 10
+    r = rospy.ServiceProxy('/check_point_in_soma_roi',geometry_msgs.msg.Point)
+
+    rospy.spin()
