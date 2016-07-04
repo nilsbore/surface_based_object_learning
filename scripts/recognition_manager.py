@@ -87,8 +87,7 @@ class ObjectRecognitionManager:
         self.listener = tf.TransformListener()
         # let the listener grab a few frames of tf
         rospy.sleep(1)
-        self.rec_service = rospy.ServiceProxy(
-            "/recognition_service/sv_recognition", recognize)
+        self.rec_service = rospy.ServiceProxy("/sv_recognition", recognize)
 
     def get_most_likely_label(self, cluster):
         # get the map bbox of cluster
