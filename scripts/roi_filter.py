@@ -41,7 +41,7 @@ class ROIFilter:
         point_check_service = rospy.Service('/check_point_in_soma_roi',PointInROI,self.roi_check_service_cb)
         rospy.loginfo("SOMa ROI check service running")
 
-    def roi_check_service_cb(self,req):
+    def roi_check_service_cb(self, req):
         p = self.ros_point_in_roi(req.input)
         return PointInROIResponse(p)
 
