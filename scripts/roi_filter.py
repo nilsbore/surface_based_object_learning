@@ -177,10 +177,16 @@ if __name__ == '__main__':
 
 
     rospy.loginfo("getting service")
+
     point = geometry_msgs.msg.Point()
     point.x = 10
     point.y = 10
     point.z = 10
+
     service = rospy.ServiceProxy('/check_point_in_soma_roi',PointInROI)
-    rospy.loginfo("done, got service")
+    out = service(point)
+
+    rospy.loginfo("the result is: ")
+    rospy.loginfo(out)
+    rospy.loginfo("done!")
     rospy.spin()
