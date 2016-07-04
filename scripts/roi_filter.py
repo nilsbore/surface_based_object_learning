@@ -22,7 +22,7 @@ from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
 import python_pcd
 from shapely.geometry import MultiPoint
-from world_modeling.srv import PointInROI.srv
+from world_modeling.srv import PointInROI
 
 
 class ROIFilter:
