@@ -21,6 +21,7 @@ import tf2_ros
 from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
 import python_pcd
+import shapely.geometry
 from shapely.geometry import MultiPoint
 from world_modeling.srv import PointInROI
 
