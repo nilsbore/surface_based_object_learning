@@ -77,7 +77,7 @@ class ObjectRecognitionManager:
         rospy.loginfo("-- 10 SECONDS --")
         self.setup_clean = False
         try:
-            rospy.wait_for_service("/sv_recognition", 10)
+            rospy.wait_for_service("sv_recognition", 10)
             self.setup_clean = True
         except Exception, e:
             rospy.logwarn(
@@ -87,7 +87,7 @@ class ObjectRecognitionManager:
         self.listener = tf.TransformListener()
         # let the listener grab a few frames of tf
         rospy.sleep(1)
-        self.rec_service = rospy.ServiceProxy("/sv_recognition", recognize)
+        self.rec_service = rospy.ServiceProxy("sv_recognition", recognize)
 
     def get_most_likely_label(self, cluster):
         # get the map bbox of cluster
@@ -203,44 +203,15 @@ if __name__ == '__main__':
     rospy.init_node('recog_manager_test', anonymous=True)
     r = ObjectRecognitionManager()
     print("done, testing")
-    testcl = python_pcd.read_pcd("tests/cloud_00000012.pcd")
-    testcl = testcl[0]
-    r.recognise_scene(testcl)
 
     cluster_tracker = SOMAClusterTracker()
     cluster_tracker.add_unsegmented_scene(testcl)
 
-    r.assign_labels(cluster_tracker.cur_scene)
-    r.assign_labels(cluster_tracker.cur_scene)
+#    r.assign_labels(cluster_tracker.cur_scene)
+#    r.assign_labels(cluster_tracker.cur_scene)
 
 
-#    x = 0
-    #y = 0
-#    z = 0
-    #c = 0
 
-    # for cluster in cluster_tracker.cur_scene.cluster_list:
-    #    print(cluster.map_centroid)
-    #    print(cluster.local_centroid)
-    ##    python_pcd.write_pcd("seg.pcd",cluster.segmented_pc_mapframe, overwrite=True)
 
-    # for result in r.recog_results:
-    #raw_cloud = pc2.read_points(result.cloud)
-    #raw_cloud = r.transform_cloud(result.cloud)
-    #python_pcd.write_pcd("rec.pcd",result.cloud, overwrite=True)
-
-    #    for p in pc2.read_points(result.cloud):
-    #        x+=p[0]
-    #        y+=p[1]
-    #        z+=p[2]
-    #        c+=1
-
-    #    x/=c
-    #    y/=c
-    #    z/=c
-    #    print(x)
-    #    print(y)
-    #    print(z)
-    #    print(c)
 
     rospy.spin()
