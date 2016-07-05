@@ -96,7 +96,7 @@ class ObjectRecognitionManager:
                 "*** World_state_manager does not have recognition service")
             return
 
-        bbox = cluster.bbox_local
+        bbox = cluster.bbox
         rospy.loginfo("-- Getting most likely label for cluster --")
         if(cluster.label):
             rospy.loginfo("-- Cluster already has a label--")
@@ -109,7 +109,9 @@ class ObjectRecognitionManager:
         scores = {}
         scores[(uk, cluster)] = ClusterScore(uk, cluster, 0)
         for result in self.recog_results:
-            cloud = result.cloud
+            cloud = self.transform_cloud(result.cloud)
+            # translate cloud to map
+
             scores[(result, cluster)] = ClusterScore(result, cluster, 0)
 
             total = 0
@@ -194,8 +196,7 @@ class ObjectRecognitionManager:
         for label, conf, cloud in zip(response.ids, response.confidence, response.models_cloud):
             r = RecognitionResult(label.data, conf, cloud)
             self.recog_results.append(r)
-            rospy.loginfo("RESULT: " + str(r.label) + " at " +
-                          str(r.confidence) + " confidence")
+            rospy.loginfo("RESULT: " + str(r.label) + " at " + str(r.confidence) + " confidence")
 
         rospy.loginfo("--- recognition complete ---")
         return True

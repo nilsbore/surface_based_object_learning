@@ -54,12 +54,16 @@ class ROIFilter:
         self.soma_polygons = []
         rospy.loginfo("ROI TYPES: ")
         for roi in response.rois:
-            rospy.loginfo(roi.type)
+
 
             if("NavArea" in roi.type):
+                rospy.loginfo(roi.type+" \t SKIPPING")
                 continue
             if("Human" in roi.type):
+                rospy.loginfo(roi.type+" \t SKIPPING")
                 continue
+
+            rospy.loginfo(roi.type+" \t ACCEPTING")
 
             points = roi.posearray.poses
             points_2d = []
