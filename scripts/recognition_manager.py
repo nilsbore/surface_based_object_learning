@@ -214,12 +214,14 @@ if __name__ == '__main__':
     except Exception, e:
         rospy.logwarn("Could not get singleview recognition service, recognition will not be performed")
 
-    rospy.loginfo("-- Got recognition service --")
+    rospy.loginfo("-- Attaching recognition service --")
 
     rec_service = rospy.ServiceProxy("/recognition_service/sv_recognition", recognize)
-    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    rospy.loginfo("-- Done! --")
+
+    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2,10)
     rospy.loginfo("-- Got Cloud --")
-    
+
 
 
 
