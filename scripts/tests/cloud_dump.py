@@ -37,8 +37,9 @@ if __name__ == '__main__':
                 wo = world_model.get_object(x.id)
                 fo = wo._observations[0]
                 ma = fo.get_message("/head_xtion/depth_registered/points")
+                cloud = ma.retrieve()
 
-                python_pcd.write_pcd(x.id+".pcd",ma)
+                python_pcd.write_pcd(x.id+".pcd",cloud)
 
                 if(success):
                     print("cloud file written")
