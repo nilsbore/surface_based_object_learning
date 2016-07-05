@@ -147,7 +147,7 @@ class ObjectRecognitionManager:
         return best.one.label, best.one.confidence
 
     def assign_labels(self, scene):
-        rospy.loginfi("Assigning Labels")
+        rospy.loginfo("Assigning Labels")
         for cluster in scene.cluster_list:
             rospy.loginfo("Processing Cluster " + cluster.cluster_id)
             label, confidence = self.get_most_likely_label(cluster)
@@ -186,6 +186,8 @@ class ObjectRecognitionManager:
             response = self.rec_service(cloud=input_cloud)
         except Exception, e:
             rospy.logwarn("Recognition failed")
+
+        rospy.loginfo(response)
 
         self.recog_results = []
 
