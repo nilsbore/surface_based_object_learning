@@ -56,9 +56,9 @@ class ROIFilter:
         for roi in response.rois:
             rospy.loginfo(roi.type)
 
-            if("RobotNavArea" in roi.type):
+            if("NavArea" in roi.type):
                 continue
-            if("HumanWorkplace" in roi.type):
+            if("Human" in roi.type):
                 continue
 
             points = roi.posearray.poses
