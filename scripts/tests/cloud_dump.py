@@ -38,7 +38,7 @@ if __name__ == '__main__':
                 fo = wo._observations[0]
                 ma = fo.get_message("/head_xtion/depth_registered/points")
 
-                python_pcd.write_pcd(x.id+".pcd",fo)
+                python_pcd.write_pcd(x.id+".pcd",ma)
 
                 if(success):
                     print("cloud file written")
