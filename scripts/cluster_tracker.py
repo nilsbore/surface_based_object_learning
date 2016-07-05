@@ -502,12 +502,12 @@ class SegmentedScene:
             cur_cluster.map_centroid = np.array((ps_t.point.x ,ps_t.point.y, ps_t.point.z))
 
             # filter based on SOMA ROI info #
-            #if(roi_filter):
-            #    if(roi_filter.point_in_roi([ps_t.point.x,ps_t.point.y])):
-            #        rospy.logwarn("This object is within a SOMA ROI, continuing processing")
-            #    else:
-            #        rospy.logwarn("This object is NOT within a SOMA ROI, not processing")
-            #        continue
+            if(roi_filter):
+                if(roi_filter.point_in_roi([ps_t.point.x,ps_t.point.y])):
+                    rospy.logwarn("This object is within a SOMA ROI, continuing processing")
+                else:
+                    rospy.logwarn("This object is NOT within a SOMA ROI, not processing")
+                    continue
 
             cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
 
@@ -647,9 +647,9 @@ class SOMAClusterTracker:
         # segment the pc
         try:
             rospy.loginfo("filtering this cloud by SOMA ROI")
-            filtered_cloud = self.roi_filter.filter_full_cloud(data)
+            #filtered_cloud = self.roi_filter.filter_full_cloud(data)
             rospy.loginfo("segmenting (may take a second)")
-            rgb,indices = self.segmenter.segment(filtered_cloud)
+            rgb,indices = self.segmenter.segment(data)
 
             rospy.loginfo("segmentation done")
             new_scene = SegmentedScene(indices,rgb,data,self.roi_filter)
