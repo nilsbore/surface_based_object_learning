@@ -140,17 +140,6 @@ class ViewAlignmentManager:
         rospy.loginfo("calling alignment service")
         rospy.loginfo("scenes: " + str(len(scenes)))
 
-        #rospy.loginfo("CLOUD HEADERS: ")
-        #for k in scenes:
-        #    print(k.header)
-
-        #rospy.loginfo("CLOUD FIELLDDS: ")
-        #for k in scenes:
-        #    print(k.fields)
-
-        #rospy.loginfo("TRANSFORMS: ")
-        #for x in transforms:
-        #    print(x)
 
         response = None
         try:
