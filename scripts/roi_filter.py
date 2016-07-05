@@ -52,8 +52,10 @@ class ROIFilter:
         response = self.soma_query(query)
 
         self.soma_polygons = []
-
+        rospy.loginfo("ROI TYPES: ")
         for roi in response.rois:
+            rospy.loginfo(roi.type)
+
             if("RobotNavArea" in roi.type):
                 continue
             if("HumanWorkplace" in roi.type):
