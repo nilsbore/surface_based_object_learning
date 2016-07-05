@@ -140,17 +140,17 @@ class ViewAlignmentManager:
         rospy.loginfo("calling alignment service")
         rospy.loginfo("scenes: " + str(len(scenes)))
 
-        rospy.loginfo("CLOUD HEADERS: ")
-        for k in scenes:
-            print(k.header)
+        #rospy.loginfo("CLOUD HEADERS: ")
+        #for k in scenes:
+        #    print(k.header)
 
-        rospy.loginfo("CLOUD FIELLDDS: ")
-        for k in scenes:
-            print(k.fields)
+        #rospy.loginfo("CLOUD FIELLDDS: ")
+        #for k in scenes:
+        #    print(k.fields)
 
-        rospy.loginfo("TRANSFORMS: ")
-        for x in transforms:
-            print(x)
+        #rospy.loginfo("TRANSFORMS: ")
+        #for x in transforms:
+        #    print(x)
 
         response = None
         try:
@@ -188,8 +188,8 @@ class ViewAlignmentManager:
             t_st = TransformationStore().msg_to_transformer(tf_p)
 
             cam_cloud = o.get_message('object_cloud_camframe')
-            rospy.loginfo("cam header: ")
-            rospy.loginfo(cam_cloud.header)
+            #rospy.loginfo("cam header: ")
+            #rospy.loginfo(cam_cloud.header)
             obs_cloud = o.get_message('/head_xtion/depth_registered/points')
             self.set_frames(obs_cloud)
             c_time = t_st.getLatestCommonTime(self.child_camera_frame,self.root_camera_frame)
@@ -296,7 +296,7 @@ if __name__ == '__main__':
     obj = world_model.get_object("130c4040-50a2-4318-aa25-9b5a1c0b3810")
     rospy.loginfo("got object")
 
-    rospy.loginfo(obj._point_cloud)
+    #rospy.loginfo(obj._point_cloud)
 
     rospy.loginfo("observations: " + str(len(obj._observations)))
     pub = rospy.Publisher('/world_modeling/align_and_merge_test', PointCloud2, queue_size=10)

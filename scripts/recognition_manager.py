@@ -187,7 +187,7 @@ class ObjectRecognitionManager:
         except Exception, e:
             rospy.logwarn("Recognition failed")
 
-        rospy.loginfo(response)
+        #rospy.loginfo(response)
 
         self.recog_results = []
 
