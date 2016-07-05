@@ -201,16 +201,25 @@ class ObjectRecognitionManager:
 
 if __name__ == '__main__':
     rospy.init_node('recog_manager_test', anonymous=True)
-    r = ObjectRecognitionManager()
+#    r = ObjectRecognitionManager()
     print("done, testing")
 
-    cluster_tracker = SOMAClusterTracker()
-    cluster_tracker.add_unsegmented_scene(testcl)
+#    cluster_tracker = SOMAClusterTracker()
+#    cluster_tracker.add_unsegmented_scene(testcl)
 
-#    r.assign_labels(cluster_tracker.cur_scene)
-#    r.assign_labels(cluster_tracker.cur_scene)
+    rospy.loginfo("-- Waiting for Object Recognition Service --")
+    rospy.loginfo("-- 10 SECONDS --")
+    try:
+        rospy.wait_for_service("/recognition_service/sv_recognition", 10)
+    except Exception, e:
+        rospy.logwarn("Could not get singleview recognition service, recognition will not be performed")
 
+    rospy.loginfo("-- Got recognition service --")
 
+    rec_service = rospy.ServiceProxy("/recognition_service/sv_recognition", recognize)
+    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    rospy.loginfo("-- Got Cloud --")
+    
 
 
 
