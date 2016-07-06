@@ -502,12 +502,12 @@ class SegmentedScene:
             cur_cluster.map_centroid = np.array((ps_t.point.x ,ps_t.point.y, ps_t.point.z))
 
             # filter based on SOMA ROI info #
-            if(roi_filter):
-                if(roi_filter.point_in_roi([ps_t.point.x,ps_t.point.y])):
-                    rospy.logwarn("This object is within a SOMA ROI, continuing processing")
-                else:
-                    rospy.logwarn("This object is NOT within a SOMA ROI, not processing")
-                    continue
+            point_in_roi = point_in_roi([ps_t.point.x,ps_t.point.y])
+            if(point_in_roi is True):
+                rospy.loginfo("Point is in SOMa ROI")
+            else:
+                rospy.loginfo("Point is NOT in SOMa ROI")
+
 
             cur_cluster.local_centroid = np.array((x_local,y_local,z_local))
 
