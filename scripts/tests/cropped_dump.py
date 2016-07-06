@@ -32,7 +32,7 @@ if __name__ == '__main__':
         world_model = World(server_host='localhost',server_port=62345)
         for x in response.objects:
             print(x.id)
-            if(x.logtimestamp > 1467645744):
+            if(x.logtimestamp < 1467645744):
                 wo = world_model.get_object(x.id)
                 fo = wo._observations[0]
                 ma = fo.get_message("cropped_image")
