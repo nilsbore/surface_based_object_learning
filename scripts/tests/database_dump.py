@@ -32,7 +32,7 @@ if __name__ == '__main__':
         world_model = World(server_host='localhost',server_port=62345)
         for x in response.objects:
             wo = world_model.get_object(x.id)
-            for k in wo._observations
+            for k in wo._observations:
                 cloud = k.get_message("/head_xtion/depth_registered/points")
                 rgb_img = k.get_message("/head_xtion/rgb/image_rect_color")
                 camera_info = None
@@ -46,6 +46,9 @@ if __name__ == '__main__':
                     camera_info = k.get_message("/head_xtion/depth_registered/camera_info")
                 except Exception,e:
                     print("couldn't find second topic")
+
+                if(camera_info is None):
+                    print("---- unable to find either topic")
 
                 robot_pose = k.get_message("/robot_pose")
                 tf = k.get_message("/tf")
