@@ -11,6 +11,10 @@ from soma_manager.srv import *
 from geometry_msgs.msg import Pose
 from soma_io.state import World, Object
 
+import python_pcd
+import pickle
+import os
+
 if __name__ == '__main__':
     rospy.init_node('test_masks', anonymous = False)
     print("getting soma service")
@@ -30,8 +34,19 @@ if __name__ == '__main__':
     else:
         print("got " + str(len(response.objects)) + " SOMA objects")
         world_model = World(server_host='localhost',server_port=62345)
+        episodes = []
         for x in response.objects:
             wo = world_model.get_object(x.id)
+
+            if(wo.view_episode_id in episodes):
+                continue
+            else:
+                episodes.append(wo.view_episode_id)
+
+            directory = "view_episodes/"+str(wo.view_episode)+"/"
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
             for k in wo._observations:
                 cloud = k.get_message("/head_xtion/depth_registered/points")
                 rgb_img = k.get_message("/head_xtion/rgb/image_rect_color")
@@ -52,5 +67,7 @@ if __name__ == '__main__':
 
                 robot_pose = k.get_message("/robot_pose")
                 tf = k.get_message("/tf")
+
+                pickle.dump(tf,open(directory+"tf.p",wb))
 
     print("done")
