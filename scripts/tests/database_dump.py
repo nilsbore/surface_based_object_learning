@@ -76,11 +76,11 @@ if __name__ == '__main__':
 
 
                 metadata = [str(wo._life_end),str(wo._life_start),str(wo.key),str(wo._parent)]
-                
+
                 pickle.dump(metadata,open(directory+"data.p",'wb'))
                 pickle.dump(rgb_img,open(directory+"image.p",'wb'))
                 pickle.dump(cloud,open(directory+"cloud.p",'wb'))
-                pickle.dump(tf,open(directory+"tf.p",wb))
+                pickle.dump(tf,open(directory+"tf.p",'wb'))
                 pickle.dump(camera_info,open(directory+"camera_info.p",'wb'))
                 pickle.dump(robot_pose,open(directory+"robot_pose.p",'wb'))
 
