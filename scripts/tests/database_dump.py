@@ -43,7 +43,7 @@ if __name__ == '__main__':
             else:
                 episodes.append(wo.view_episode_id)
 
-            directory = "view_episodes/"+str(wo.view_episode)+"/"
+            directory = "view_episodes/"+str(wo.view_episode_id)+"/"
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
@@ -68,6 +68,18 @@ if __name__ == '__main__':
                 robot_pose = k.get_message("/robot_pose")
                 tf = k.get_message("/tf")
 
+                #cl = cloud.retrieve()
+                #python_pcd.write_pcd(directory+"cloud.pcd", cl)
+
+                #cv_image = self.bridge.imgmsg_to_cv2(rgb_img, desired_encoding="passthrough")
+                #cv2.imwrite(directory+'rgb.jpeg',cv_image)
+
+
+
+                pickle.dump(rgb_img,open(directory+"image.p",wb))
+                pickle.dump(cloud,open(directory+"cloud.p",wb))
                 pickle.dump(tf,open(directory+"tf.p",wb))
+                pickle.dump(camera_info,open(directory+"camera_info.p",wb))
+                pickle.dump(robot_pose,open(directory+"robot_pose.p",wb))
 
     print("done")
