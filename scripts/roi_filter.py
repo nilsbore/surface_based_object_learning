@@ -52,18 +52,18 @@ class ROIFilter:
         response = self.soma_query(query)
 
         self.soma_polygons = []
-        rospy.loginfo("ROI TYPES: ")
+        #rospy.loginfo("ROI TYPES: ")
         for roi in response.rois:
 
 
             if("NavArea" in roi.type):
-                rospy.loginfo(roi.type+" \t SKIPPING")
+                #rospy.loginfo(roi.type+" \t SKIPPING")
                 continue
             if("Human" in roi.type):
-                rospy.loginfo(roi.type+" \t SKIPPING")
+                #rospy.loginfo(roi.type+" \t SKIPPING")
                 continue
 
-            rospy.loginfo(roi.type+" \t ACCEPTING")
+            #rospy.loginfo(roi.type+" \t ACCEPTING")
 
             points = roi.posearray.poses
             points_2d = []
@@ -111,13 +111,32 @@ class ROIFilter:
                 return True
         return False
 
-    def filter_full_cloud(self,cloud):
+    def accel_point_in_roi(self,point_in):
+        point = shapely.geometry.Point(point_in[0],point_in[1])
+        for polygon in self.soma_polygons:
+            if(polygon.contains(point)):
+                return True
+        return False
+
+    def accel_any_point_in_roi(self,cloud_in):
+
+        for k in cloud_in:
+            point = shapely.geometry.Point(k[0],k[1])
+            for polygon in self.soma_polygons:
+                if(polygon.contains(point)):
+                    return True
+        return False
+
+    def filter_full_cloud(self,cloud,tf=None):
         filtered_points = []
         self.gather_rois()
         rospy.loginfo("filtering full cloud")
         #print(cloud.fields)
         #python_pcd.write_pcd("input_points.pcd", cloud, overwrite=True)
-        mc = self.transform_frame_to_map(cloud)
+        mc = cloud
+        if(tf is not None):
+            mc = self.transform_frame_to_map(cloud,tf)
+
         map_int_data = list(pc2.read_points(mc))
         orig_int_data = list(pc2.read_points(cloud))
 
@@ -141,14 +160,19 @@ class ROIFilter:
                                          t.transform.translation.y,
                                          t.transform.translation.z))
 
-    def transform_frame_to_map(self,cloud):
+    def transform_frame_to_map(self,cloud,tf):
         rospy.loginfo("creating transformer")
-        self.listener = tf.TransformListener()
+
+        if(tf is None):
+            self.listener = tf.TransformListener()
+        else:
+            self.listener = TransformationStore().msg_to_transformer(tf)
+
+
         rospy.sleep(5)
         self.child_camera_frame = cloud.header.frame_id
         rospy.loginfo("doing conversion")
         t = self.listener.getLatestCommonTime("map", self.child_camera_frame)
-        self.listener.waitForTransform("map", self.child_camera_frame, t, rospy.Duration(5.0))
         tr_r = self.listener.lookupTransform("map", self.child_camera_frame, t)
 
         tr = Transform()

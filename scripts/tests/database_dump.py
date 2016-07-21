@@ -10,6 +10,7 @@ from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose
 from soma_io.state import World, Object
+from soma_io.observation import Observation, TransformationStore
 
 import python_pcd
 import pickle
@@ -38,16 +39,23 @@ if __name__ == '__main__':
         for x in response.objects:
             wo = world_model.get_object(x.id)
 
-            if(wo.view_episode_id in episodes):
-                continue
-            else:
-                episodes.append(wo.view_episode_id)
+            #if(wo.view_episode_id in episodes):
+            #        continue
+            #else:
+            #    episodes.append(wo.view_episode_id)
 
-            directory = "view_episodes/"+str(wo.view_episode_id)+"/"
+            directory = "view_episodes/"+str(wo.view_episode_id)+"/"+x.id+"/"
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
+            count = 0
             for k in wo._observations:
+
+                obs_directory = directory+"/"+str(count)+"/"
+                if not os.path.exists(obs_directory):
+                    os.makedirs(obs_directory)
+                count+=1
+
                 cloud = k.get_message("/head_xtion/depth_registered/points")
                 rgb_img = k.get_message("/head_xtion/rgb/image_rect_color")
                 camera_info = None
@@ -64,6 +72,8 @@ if __name__ == '__main__':
 
                 if(camera_info is None):
                     print("---- unable to find either topic")
+                else:
+                    print("got a topic eventually")
 
                 robot_pose = k.get_message("/robot_pose")
                 tf = k.get_message("/tf")
@@ -77,11 +87,11 @@ if __name__ == '__main__':
 
                 metadata = [str(wo._life_end),str(wo._life_start),str(wo.key),str(wo._parent)]
 
-                pickle.dump(metadata,open(directory+"data.p",'wb'))
-                pickle.dump(rgb_img,open(directory+"image.p",'wb'))
-                pickle.dump(cloud,open(directory+"cloud.p",'wb'))
-                pickle.dump(tf,open(directory+"tf.p",'wb'))
-                pickle.dump(camera_info,open(directory+"camera_info.p",'wb'))
-                pickle.dump(robot_pose,open(directory+"robot_pose.p",'wb'))
+                pickle.dump(metadata,open(obs_directory+"data.p",'wb'))
+                pickle.dump(rgb_img,open(obs_directory+"image.p",'wb'))
+                pickle.dump(cloud,open(obs_directory+"cloud.p",'wb'))
+                pickle.dump(tf,open(obs_directory+"tf.p",'wb'))
+                pickle.dump(camera_info,open(obs_directory+"camera_info.p",'wb'))
+                pickle.dump(robot_pose,open(obs_directory+"robot_pose.p",'wb'))
 
     print("done")

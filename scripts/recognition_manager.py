@@ -172,17 +172,6 @@ class ObjectRecognitionManager:
 
         tr_r = []
 
-        # try:
-        #    rospy.loginfo("Looking for transform to map coordinates")
-        #t = self.listener.getLatestCommonTime("map", self.frame)
-        #self.listener.waitForTransform("map", self.frame, t, rospy.Duration(5.0))
-        #tr_r = self.listener.lookupTransform("map", self.frame, t)
-        #tr.translation = Vector3(tr_r[0][0],tr_r[0][1],tr_r[0][2])
-        #tr.rotation = Quaternion(tr_r[1][0],tr_r[1][1],tr_r[1][2],tr_r[1][3])
-        # except Exception,e:
-        #    rospy.logwarn("Failed to get transform to map co-ordinates")
-        #rospy.loginfo("Got transform successfully")
-
         rospy.loginfo("Running Recognition")
         try:
             response = self.rec_service(cloud=input_cloud)

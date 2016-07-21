@@ -9,6 +9,11 @@ import os
 from random import randint
 import cv2
 
+# view store STUFF
+from mongodb_store.message_store import MessageStoreProxy
+from soma_io.mongo import MongoDocument, MongoTransformable, MongoConnection
+
+
 # ROS stuff
 from sensor_msgs.msg import PointCloud2, PointField
 from cluster_tracker import SOMAClusterTracker
@@ -42,6 +47,33 @@ import python_pcd
 
 talk = True
 
+class StoredView(MongoDocument):
+    def __init__(self, mongo=None):
+        super(StoredView, self).__init__()
+        if mongo is not None:
+            # this will create the document live..
+            self._connect(mongo)
+        self.id = None
+        self.point_cloud = None
+        self.rgb_image = None
+        self.robot_pose = None
+        self.camera_info = None
+        self.tf = None
+        self.view_episode_id = None
+
+    @classmethod
+    def _mongo_encode(cls, class_object):
+        doc = {}
+        doc.update(class_object.__dict__)
+        try:
+            doc.pop("_MongoDocument__mongo")
+            doc.pop("_MongoDocument__connected")
+        except KeyError:
+            print "Warning: no no no"
+        doc["__pyobject_class_type"] = class_object.get_pyoboject_class_string()
+        doc = copy.deepcopy(doc)
+        return doc
+
 class WorldStateManager:
 
     def __init__(self,db_hostname,db_port):
@@ -50,14 +82,6 @@ class WorldStateManager:
         if(talk): rospy.loginfo("Manager Online")
         # make a cluster tracker
         rospy.loginfo("looking for camera info topic")
-        self.camera_info_topic = self.get_camera_info_topic_as_string()
-        if(self.camera_info_topic is None):
-            rospy.loginfo("Unable to find camera_info topic for depth camera")
-            rospy.loginfo("Setup of node failed")
-            return
-        else:
-            rospy.loginfo("camera info topic found at: " + self.camera_info_topic)
-
 
         self.world_model = World(server_host=db_hostname,server_port=int(db_port))
         if(talk): rospy.loginfo("world model done")
@@ -66,11 +90,10 @@ class WorldStateManager:
         self.pending_obs = []
         self.cur_sequence_obj_ids = []
         self.cur_view_soma_ids = []
+        self.cur_observation_data = None
 
-        # get the current point cloud
-        #if(talk): rospy.loginfo("waiting for pc")
-        #rospy.wait_for_message('/head_xtion/depth_registered/points',PointCloud2)
-        #if(talk): rospy.loginfo("got it")
+        ## set up things for the view store ##
+        self.view_store = MongoConnection("surface_view_store", db_hostname, int(db_port))
 
         rospy.loginfo("setting up services")
         update_world_state = rospy.Service('update_world_model',WorldUpdate,self.object_segment_callback)
@@ -96,7 +119,7 @@ class WorldStateManager:
         rospy.wait_for_service('/soma2/update_object')
         rospy.loginfo("done")
         self.soma_update = rospy.ServiceProxy('soma2/update_object',SOMA2UpdateObject)
-        self.recog_manager = ObjectRecognitionManager()
+        self.recog_manager = None
         rospy.loginfo("setting up view alignment manager")
         self.view_alignment_manager = ViewAlignmentManager()
 
@@ -105,7 +128,7 @@ class WorldStateManager:
         rospy.loginfo("-- node setup completed --")
         self.setup_clean = True
 
-        rospy.spin()
+        #rospy.spin()
 
     def person_segment_callback(self,req):
         if(self.setup_clean is False):
@@ -247,45 +270,92 @@ class WorldStateManager:
         # update this object in some way
         # TODO: HOW?
 
+
+    def flush_observation(self,data):
+        print("-- flushing observation from dataset through system --")
+        self.process_cloud(data['cloud'],data['data'][3],data)
+
+    def create_view_store_msg(self,data):
+        message_proxy = MessageStoreProxy(collection="surface_view_store")
+        msg_id = message_proxy.insert(data)
+        pc_msg = MessageStoreObject(
+            database=message_proxy.database,
+            collection=message_proxy.collection,
+            obj_id=msg_id,
+            typ=data._type)
+        return pc_msg
+
+    def place_in_view_store(self,cloud,extra_data=None):
+        try:
+            if(self.cur_observation_data is None):
+                self.get_observation_data(cloud,extra_data)
+
+            new_view = StoredView()
+            new_view.point_cloud = self.create_view_store_msg(cloud)
+            new_view.id = str(uuid.uuid4())
+            new_view.rgb_image = self.create_view_store_msg(self.cur_observation_data['rgb_image'])
+            new_view.robot_pose = self.create_view_store_msg(self.cur_observation_data['robot_pose'])
+            new_view.camera_info = self.create_view_store_msg(self.cur_observation_data['camera_info'])
+            new_view.tf = self.create_view_store_msg(self.cur_observation_data['tf'])
+            new_view.view_episode_id = self.view_episode_id;
+            new_id = self.view_store.database.views.insert(StoredView._mongo_encode(new_view))
+            new_view.id = new_id
+
+        #    new_view._connect(self.view_store)
+            rospy.loginfo("successfully added view to view store")
+        except Exception,e:
+            rospy.loginfo("failed to add view to view store")
+
+
+    def process_cloud(self,cloud,waypoint,extra_data=None):
+        try:
+            rospy.loginfo("---- Storing view in View Store ----")
+            self.get_observation_data(cloud,extra_data)
+            self.place_in_view_store(cloud)
+
+            rospy.loginfo("---- Segmenting Scene ----")
+            scene = self.cluster_tracker.add_unsegmented_scene(cloud,extra_data)
+            if(scene.clean_setup is True):
+
+                scene.waypoint = waypoint
+
+                if(self.recog_manager):
+                    rospy.loginfo("---- Running Object Recognition ----")
+                    recognition = self.recog_manager.recognise_scene(cloud)
+                    if(recognition is True):
+                        self.recog_manager.assign_labels(scene)
+                else:
+                    rospy.logwarn("Object recognition service not found, try restarting is the node running?")
+
+                self.assign_clusters(scene,self.cluster_tracker.prev_scene,extra_data)
+                self.pending_obs.append(scene)
+
+                rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
+
+                return WorldUpdateResponse(True,self.cur_view_soma_ids)
+            else:
+                rospy.loginfo("Error in processing scene")
+
+        except Exception,e:
+            rospy.logerr("Unable to segment and process this scene")
+            rospy.logerr(e)
+
     def object_segment_callback(self, req):
+        result = WorldUpdateResponse(False,self.cur_view_soma_ids)
         if(self.setup_clean is False):
             rospy.logerr("-- world_modeling node is missing one or more key services, cannot act --")
             rospy.logerr("-- run services and then re-start me --")
-            return WorldUpdateResponse(False,self.cur_view_soma_ids)
+            return result
         else:
 
             if(req.input is None):
                 rospy.logwarn("-- This point cloud looks empty, is the service being called correctly? ---")
                 rospy.logwarn("-- Stopping Processing ---")
-                return WorldUpdateResponse(False,self.cur_view_soma_ids)
+                return result
 
-            try:
-                rospy.loginfo("---- Segmenting Scene ----")
-                scene = self.cluster_tracker.add_unsegmented_scene(req.input)
-                if(scene.clean_setup is True):
-                    scene.waypoint = req.waypoint
+            result = self.process_cloud(req.input,req.waypoint)
 
-                    if(self.recog_manager):
-                        rospy.loginfo("---- Running Object Recognition ----")
-                        recognition = self.recog_manager.recognise_scene(req.input)
-                        if(recognition is True):
-                            self.recog_manager.assign_labels(scene)
-                    else:
-                        rospy.logwarn("Object recognition service not found, try restarting is the node running?")
-
-                    self.assign_clusters(scene,self.cluster_tracker.prev_scene)
-                    self.pending_obs.append(scene)
-
-                    rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
-
-                    return WorldUpdateResponse(True,self.cur_view_soma_ids)
-                else:
-                    rospy.loginfo("Error in processing scene")
-            except Exception,e:
-                rospy.logerr("Unable to segment and process this scene")
-                rospy.logerr(e)
-
-            return WorldUpdateResponse(False,self.cur_view_soma_ids)
+            return result
 
     def do_postprocessing(self):
         rospy.loginfo("-- beginning post-processing, attempting view alignment and object label updates -- ")
@@ -323,6 +393,7 @@ class WorldStateManager:
                 try:
                     rospy.loginfo("updating world model")
                     merged_cloud = self.view_alignment_manager.register_views(observations)
+                    rospy.loginfo("got merged cloud, putting it into the message store")
                     message_proxy = MessageStoreProxy(collection="ws_merged_aligned_clouds")
                     msg_id = message_proxy.insert(merged_cloud)
                     mso = MessageStoreObject(
@@ -333,7 +404,7 @@ class WorldStateManager:
                     world_object._point_cloud = mso
 
                     # update SOMA
-                    rospy.loginfo("updating SOMA")
+                    rospy.loginfo("updating SOMA obj itself")
                     soma_objects.objects[0].cloud = merged_cloud
 
                     self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
@@ -360,14 +431,26 @@ class WorldStateManager:
     def cluster_is_live(self,cluster_id,waypoint):
         if(talk): rospy.loginfo("seeing if object exists:" + str(cluster_id) +" in: " + waypoint)
         exists = self.world_model.does_object_exist(cluster_id)
-
-        if(exists):
-            live_objects = map(lambda x: x.name, self.world_model.get_children(waypoint, {'_life_end': None,}))
-            if(talk): rospy.loginfo("live objects:" + str(live_objects))
-            if(talk): rospy.loginfo("cid: " + str(cluster_id))
-            if(cluster_id in live_objects):
-                if(talk): rospy.loginfo("it does!")
+        db = self.world_model._mongo.database.Objects.find({"__pyobject_class_type": Object.get_pyoboject_class_string(),'key': cluster_id,})
+        if(db):
+            print("uhhh i got something")
+            if(db.count() != 0):
+                print("True!")
                 return True
+            else:
+                print("False!")
+                return False
+        else:
+            print("i didn't get anything")
+
+
+        #if(exists):
+        #    live_objects = map(lambda x: x.name, self.world_model.get_children(waypoint, {'_life_end': None,}))
+        #    if(talk): rospy.loginfo("live objects:" + str(live_objects))
+        #    if(talk): rospy.loginfo("cid: " + str(cluster_id))
+        #    if(cluster_id in live_objects):
+        #        if(talk): rospy.loginfo("it does!")
+        #        return True
 
         if(talk): rospy.loginfo("nope")
         return False
@@ -402,10 +485,50 @@ class WorldStateManager:
 
         return response
 
-    def assign_clusters(self,scene,prev_scene):
+    def get_observation_data(self,scene,extra_data=None):
+        self.cur_observation_data = {}
+        if(extra_data is None):
+            rospy.loginfo("*** Making observation using live robot data")
+            try:
+                self.camera_info_topic = self.get_camera_info_topic_as_string()
+                self.cur_observation_data['rgb_image'] = rospy.wait_for_message("/head_xtion/rgb/image_rect_color", Image, timeout=10.0)
+                self.cur_observation_data['camera_info'] = rospy.wait_for_message(self.camera_info_topic, CameraInfo, timeout=10.0)
+                self.cur_observation_data['scene_cloud'] = scene.unfiltered_cloud
+                #self.cur_observation_data['ptu_state'] = rospy.wait_for_message("/ptu/state", JointState, timeout=10.0)
+                self.cur_observation_data['robot_pose'] = rospy.wait_for_message("/robot_pose", geometry_msgs.msg.Pose, timeout=10.0)
+
+                transforms = TransformationStore.create_live()
+                rospy.sleep(1) # drink in some TF
+                tf_data =  transforms.pickle_to_msg()
+                msg_id = message_proxy.insert(tf_data)
+                tf_store  = MessageStoreObject(
+                    database=message_proxy.database,
+                    collection=message_proxy.collection,
+                    obj_id=msg_id,
+                    typ=tf_data._type)
+
+                self.cur_observation_data['tf'] = tf_store
+
+            except rospy.ROSException, e:
+                rospy.logwarn("Failed to get some observation data")
+                rospy.logwarn(e)
+        else:
+                rospy.loginfo("*** Making observation using historic robot data")
+                self.cur_observation_data['rgb_image'] = extra_data['rgb_image']
+                self.cur_observation_data['camera_info'] = extra_data['camera_info']
+                self.cur_observation_data['scene_cloud'] = extra_data['cloud']
+                self.cur_observation_data['robot_pose'] = extra_data['robot_pose']
+                self.cur_observation_data['metadata'] = extra_data['data']
+                self.cur_observation_data['tf'] = extra_data['tf']
+        return self.cur_observation_data
+
+    def assign_clusters(self,scene,prev_scene,extra_data=None):
         if(talk): rospy.loginfo("assigning")
         cur_scene = scene
         self.cur_view_soma_ids = []
+
+
+
 
         if(talk): rospy.loginfo("waiting for insert service")
 
@@ -453,14 +576,22 @@ class WorldStateManager:
                 if(talk): rospy.loginfo("making observation")
                 # add an observation for the object
 
-                DEFAULT_TOPICS = [("/head_xtion/rgb/image_rect_color", Image),
-                                  (self.camera_info_topic, CameraInfo),
-                                  ("/head_xtion/depth_registered/points", PointCloud2),
-                                  ("/ptu/state", JointState),
-                                  ("/robot_pose", geometry_msgs.msg.Pose)]
+                #DEFAULT_TOPICS = [("/head_xtion/rgb/image_rect_color", Image),
+                #                  (self.camera_info_topic, CameraInfo),
+                #                  ("/head_xtion/depth_registered/points", PointCloud2),
+                #                  ("/ptu/state", JointState),
+                #                  ("/robot_pose", geometry_msgs.msg.Pose)]
+                #cloud_observation = Observation.make_observation(DEFAULT_TOPICS)
+
+                OBSERVATIONS = [("/head_xtion/rgb/image_rect_color",self.cur_observation_data['rgb_image']),
+                                ("/robot_pose",self.cur_observation_data['robot_pose']),
+                                ("/camera_info",self.cur_observation_data['camera_info']),
+                                ("/head_xtion/depth_registered/points",self.cur_observation_data['scene_cloud']),
+                                ("/tf",self.cur_observation_data['tf'])]
+
+                cloud_observation = Observation.make_observation_from_messages(OBSERVATIONS)
 
 
-                cloud_observation = Observation.make_observation(DEFAULT_TOPICS)
 
                 # centroid of this object
                 ws_pose = ws_geom.Pose()
@@ -489,53 +620,18 @@ class WorldStateManager:
                 cur_cluster._point_cloud = mso
                 cur_cluster.view_episode_id = self.view_episode_id
 
-
-
-                #cloud_observation.add_message(cur_scene_cluster.img_bbox,"image_bounding_box")
-                #cloud_observation.add_message(cur_scene_cluster.img_centroid,"image_centroid")
                 cloud_observation.add_message(cur_scene_cluster.cropped_image,"image_cropped")
                 cloud_observation.add_message(cur_scene_cluster.rgb_mask,"rgb_mask")
 
-
-                # store the cropped rgb image for this cluster
-            #    rospy.loginfo("result: ")
-            #    rospy.loginfo(res)
-                #confidences = None
-                #labels = None
-                #try:
-                #    rospy.loginfo("looking for recognition service")
-
-                #    recog_out = self.recog_service(cloud=cur_scene_cluster.segmented_pc_mapframe)
-                #    labels = recog_out.ids
-                #    confidences = recog_out.confidence
-
-                #except Exception, e:
-                #    rospy.logwarn("Couldn't run recognition service, or service not online")
-
-                #if(confidences not None):
-                #    try:
-                    #    rospy.loginfo("Trying to update world_model with output from recogniser")
-                    #    print("Confidences:")
-                    #    print(confidences)
-                    #    print("Labels: ")
-                    #    print(labels)
-                    #    cloud_observation.recognition = zip(labels,confidences)
-                    #except Exception,e:
-                    #    rospy.logwarn("Recognition successful, but unable to update world model with results")
+                if(extra_data is not None):
+                    cur_cluster._life_start = extra_data['data'][1]
+                    cur_cluster._life_end = extra_data['data'][0]
 
                 cur_cluster.add_observation(cloud_observation)
 
                 cur_soma_obj = None
 
                 soma_objs = self.get_soma_objects_with_id(cur_cluster.key)
-                ## -- writes nice cropped images to files --- #
-                #cid = cur_scene_cluster.cluster_id
-                #fid = str(randint(0,9000000))
-                #if not os.path.exists(cid):
-                #    os.makedirs(cid)
-                #success = cv2.imwrite(cid+"/"+fid+'.jpeg',cur_scene_cluster.cv_image_cropped)
-                #rospy.loginfo("SUCCESS WITH TEST WRITE: ")
-                #rospy.loginfo(success)
 
                 if(soma_objs.objects):
                     rospy.loginfo("soma has this object")
@@ -562,8 +658,11 @@ class WorldStateManager:
                         soma_pose.position.z = cur_scene_cluster.map_centroid[2]
 
                         cur_soma_obj.pose = soma_pose
-                        msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
-                        cur_soma_obj.sweepCenter = msg
+                        if(extra_data is not None):
+                            cur_soma_obj.logtimestamp = int(float(cur_cluster._life_end)) # jesus christ
+
+                        cur_soma_obj.sweepCenter = self.cur_observation_data['robot_pose']
+
                         # TODO: everything is unknown for now, but later on we'll change this to a
                         # class or instance distribution
                         rospy.loginfo("inserting into SOMA")
@@ -572,6 +671,7 @@ class WorldStateManager:
                         #rospy.loginfo(res)
                     except Exception, e:
                         rospy.logerr("unable to insert into SOMA. Is the database server running?")
+                        rospy.logerr(e)
 
                 # record all SOMA objects seen in this view
                 self.cur_view_soma_ids.append(cur_cluster.key)
@@ -597,9 +697,6 @@ class WorldStateManager:
 
         rospy.loginfo("World Update Complete")
         rospy.loginfo("")
-
-
-
 
 
 if __name__ == '__main__':
