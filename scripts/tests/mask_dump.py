@@ -10,6 +10,7 @@ from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose
 from soma_io.state import World, Object
+import os
 
 if __name__ == '__main__':
     rospy.init_node('test_masks', anonymous = False)
@@ -25,6 +26,9 @@ if __name__ == '__main__':
 
     response = soma_query(query)
 
+    if not os.path.exists("observations/"):
+        os.makedirs("observations/")
+
     if not response.objects:
         print("No SOMA objects!")
     else:
@@ -32,13 +36,22 @@ if __name__ == '__main__':
         world_model = World(server_host='localhost',server_port=62345)
         for x in response.objects:
             print(x.id)
-            if(x.logtimestamp > 1467645744):
+            if(x.type == "unknown"):
                 wo = world_model.get_object(x.id)
                 fo = wo._observations[0]
                 ma = fo.get_message("rgb_mask")
+                rg = fo.get_message("/head_xtion/rgb/image_rect_color")
                 bridge = CvBridge()
                 cv_image = bridge.imgmsg_to_cv2(ma, desired_encoding="bgr8")
-                success = cv2.imwrite(x.id+'.jpeg',cv_image)
+
+                directory = "observations/"+x.id+"/"
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+                success = cv2.imwrite(directory+'mask.jpeg',cv_image)
+
+                cv_image = bridge.imgmsg_to_cv2(rg, desired_encoding="bgr8")
+                success = cv2.imwrite(directory+'rgb.jpeg',cv_image)
+
                 if(success):
                     print("mask file written")
 
