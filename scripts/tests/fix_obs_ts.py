@@ -11,6 +11,8 @@ from soma_manager.srv import *
 from geometry_msgs.msg import Pose
 from soma_io.state import World, Object
 import os
+from pymongo import MongoClient
+import json
 
 if __name__ == '__main__':
     rospy.init_node('test_masks', anonymous = False)
@@ -26,8 +28,14 @@ if __name__ == '__main__':
 
     response = soma_query(query)
 
-    if not os.path.exists("observations/"):
-        os.makedirs("observations/")
+    #if not os.path.exists("observations/"):
+    #    os.makedirs("observations/")
+
+    client = MongoClient('localhost',62345)
+    print("gotcha")
+
+    ws_db = client['world_state']
+    objs_coll = ws_db['Objects']
 
     if not response.objects:
         print("No SOMA objects!")
@@ -38,21 +46,31 @@ if __name__ == '__main__':
             print(x.id)
             if(x.type == "unknown"):
                 wo = world_model.get_object(x.id)
-                fo = wo._observations[0]
-                ma = fo.get_message("rgb_mask")
-                rg = fo.get_message("/head_xtion/rgb/image_rect_color")
-                bridge = CvBridge()
-                #cv_image = bridge.imgmsg_to_cv2(ma, desired_encoding="bgr8")
+                print("updating ts on %d observations " % len(wo._observations))
+                db = objs_coll.find({'key': x.id,},snapshot=True)
+                if(db):
+                    print("got: " + x.id)
+                    for k in db:
+                        new_obs = []
+                        obs = k['_observations']
+                        for o in obs:
+                            print(o['stamp'])
+                            o['stamp'] = x.logtimestamp
+                            print(o['stamp'])
+                        objs_coll.save(k)
 
-                directory = "observations/"
-                #if not os.path.exists(directory):
-            #        os.makedirs(directory)
-                #success = cv2.imwrite(directory+'mask.jpeg',cv_image)
 
-                cv_image = bridge.imgmsg_to_cv2(rg, desired_encoding="bgr8")
-                success = cv2.imwrite(x.id+'_rgb.jpeg',cv_image)
+                #nobs = []
+                #for o in wo._observations:
+                #    print("updating")
+                #    o.stamp = x.logtimestamp
 
-                if(success):
-                    print("mask file written")
+                #wo._mongo_encode(wo)
+
+
+
+
+                print("done")
+                print("")
 
     print("done")

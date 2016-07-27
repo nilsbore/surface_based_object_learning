@@ -27,7 +27,7 @@ if __name__ == '__main__':
     #soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
     #print("making query")
 
-    base_dir = "/home/jxy/tsc_stuff/robot_logs/"
+    base_dir = "/home/jxy/tsc_stuff/robot_logs_cutdown/"
     bridge = CvBridge()
     world_state_manager = WorldStateManager("localhost",62345)
 
@@ -52,7 +52,7 @@ if __name__ == '__main__':
                     out['cloud']  = pickle.load(open(target+"/"+"cloud.p",'rb'))
                     out['rgb_image']  = pickle.load(open(target+"/"+"image.p",'rb'))
                     out['data'] = pickle.load(open(target+"/"+"data.p",'rb'))
-                    python_pcd.write_pcd("views/"+str(uuid.uuid4())+".pcd",out['cloud'])
+                #    python_pcd.write_pcd("views/"+str(uuid.uuid4())+".pcd",out['cloud'])
                     ep.append(out)
 
                 else:

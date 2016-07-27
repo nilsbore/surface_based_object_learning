@@ -605,9 +605,10 @@ class SegmentedScene:
             #cv2.imwrite("obj_segments_image/luma/"+str(int(al))+'.jpeg',cur_cluster.cv_image_cropped_unpadded)
 
             if(al > 50 and un_px > 1800 and un_px < 15000):
-                print("ignoring this object, looks like garbage!")
+                print("object meets our criteria!")
             #    cv2.imwrite("obj_segments_image/"+cid+'_CROPPED.jpeg',cur_cluster.cv_image_cropped)
             else:
+                print("ignoring this object, looks like garbage!")
                 continue
 
 
