@@ -196,7 +196,6 @@ class SegmentedScene:
         self.unfiltered_cloud = observation_data['scene_cloud']
         self.scene_id = str(uuid.uuid4())
         self.clean_setup = False
-        self.segment_map = {}
         self.num_segments = len(indices)
 
         self.transformation_store = tf.TransformerROS()
@@ -241,7 +240,13 @@ class SegmentedScene:
         self.to_map_rot = rotation
 
         bridge = CvBridge()
-        cv_rgb_image = bridge.imgmsg_to_cv2(scene_rgb_img)
+        cv_rgb_image = bridge.imgmsg_to_cv2(scene_rgb_img, desired_encoding="bgr8")
+
+        #print("writing cur scene")
+        #f = cv2.imwrite('stuff.png',cv_rgb_image)
+        #print(f)
+
+
         cv_depth_image = bridge.imgmsg_to_cv2(scene_depth_img)
 
         to_map = self.transform_cloud(working_cloud)
@@ -486,8 +491,8 @@ class SegmentedScene:
                 x_start = 0
 
             cur_segment.cv_rgb_image_cropped = cv_rgb_image[int(y_start):int(y_end), int(x_start):int(x_end)]
-            cur_segment.cropped_image = bridge.cv2_to_imgmsg(cur_segment.cv_rgb_image_cropped)
-            cur_segment.rgb_image_mask = bridge.cv2_to_imgmsg(rgb_image_mask)
+            cur_segment.cropped_image = bridge.cv2_to_imgmsg(cur_segment.cv_rgb_image_cropped, encoding="bgr8")
+            cur_segment.rgb_image_mask = bridge.cv2_to_imgmsg(rgb_image_mask, encoding="bgr8")
 
             hsv = cv2.cvtColor(cur_segment.cv_rgb_image_cropped_unpadded, cv2.COLOR_BGR2YUV)
 
@@ -521,16 +526,19 @@ class SegmentedScene:
             al /= pc
             print("AVG LUMA: " + str(al))
 
-            #cv2.imwrite("obj_segments_image/pixels/"+str(int(un_px))+'.jpeg',cur_segment.cv_rgb_image_cropped_unpadded)
+            #f = cv2.imwrite("obj_segments_image/pixels/"+str(int(un_px))+'.jpeg',cur_segment.cv_rgb_image_cropped_unpadded)
+            #print("done writing")
+            #print(f)
             #cv2.imwrite("obj_segments_image/luma/"+str(int(al))+'.jpeg',cur_segment.cv_rgb_image_cropped_unpadded)
 
             if(al > 50 and un_px > 1800 and un_px < 15000):
                 print("object meets our criteria!")
-            #    cv2.imwrite("obj_segments_image/"+cid+'_CROPPED.jpeg',cur_segment.cv_rgb_image_cropped)
             else:
                 print("ignoring this object, looks like garbage!")
                 continue
 
+            #f = cv2.imwrite('obj_segments_image/aaa_CROPPED.jpeg',cur_segment.cv_rgb_image_cropped_unpadded)
+            #print(f)
 
             #python_pcd.write_pcd("obj_segments_cloud/"+cid+".pcd",cur_segment.segmented_pc_camframe)
 
@@ -559,7 +567,6 @@ class SegmentedScene:
 
 
             self.segment_list.append(cur_segment)
-            self.segment_map[cur_segment.segment_id] = cur_segment
 
         self.clean_setup = True
 
@@ -658,9 +665,6 @@ if __name__ == '__main__':
     listener.kill()
     cur_observation_data['tf'] = listener.get_as_msg()
 
-
-
-
     #print(len(cur_observation_data['tf'].transforms))
 
 
@@ -668,11 +672,11 @@ if __name__ == '__main__':
     #cloud = cloud[0]
     tracker.add_unsegmented_scene(cur_observation_data)
 
-    invar = raw_input('press key to take view')
-    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
-    tracker.add_unsegmented_scene(cloud)
-    invar = raw_input('press key to take view')
-    cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
-    tracker.add_unsegmented_scene(cloud)
+    #invar = raw_input('press key to take view')
+    #cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    #tracker.add_unsegmented_scene(cloud)
+    #invar = raw_input('press key to take view')
+    #cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
+    #tracker.add_unsegmented_scene(cloud)
 
-    rospy.spin()
+    #rospy.spin()
