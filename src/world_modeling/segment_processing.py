@@ -195,12 +195,7 @@ class SegmentedScene:
             p_out = t_kdl * PyKDL.Vector(p_in[0], p_in[1], p_in[2])
             points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
 
-        fil_fields = []
-        for x in cloud.fields:
-            if(x.name in "x" or x.name in "y" or x.name in "z" or x.name in "rgb"):
-                fil_fields.append(x)
-
-        res = pc2.create_cloud(cloud.header, fil_fields, points_out)
+        res = pc2.create_cloud(cloud.header, cloud.fields, points_out)
         return res
 
     def get_moore_neighbourhood(self,point):
@@ -474,15 +469,11 @@ class SegmentedScene:
 
             cur_segment.local_centroid = np.array((x_local,y_local,z_local))
 
-            fil_fields = []
-            for x in working_cloud.fields:
-                if(x.name in "x" or x.name in "y" or x.name in "z" or x.name in "rgb"):
-                    fil_fields.append(x)
 
             header_cam = std_msgs.msg.Header()
             header_cam.stamp = rospy.Time.now()
             header_cam.frame_id = self.starting_camera_frame
-            cur_segment.segmented_pc_camframe = pc2.create_cloud(header_cam, fil_fields, segment_camframe)
+            cur_segment.segmented_pc_camframe = pc2.create_cloud(header_cam, working_cloud.fields, segment_camframe)
 
             header_map = std_msgs.msg.Header()
             header_map.stamp = rospy.Time.now()
