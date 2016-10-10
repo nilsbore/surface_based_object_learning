@@ -12,21 +12,22 @@ import cv2
 # view store STUFF
 from mongodb_store.message_store import MessageStoreProxy
 from soma_io.mongo import MongoDocument, MongoTransformable, MongoConnection
-
+from soma_llsd_msgs.msg import Segment,Observation,Scene
 
 # ROS stuff
 from sensor_msgs.msg import PointCloud2, PointField
-from cluster_tracker import SOMAClusterTracker
+from segment_processing import SegmentProcessor
 from recognition_manager import ObjectRecognitionManager
 from view_registration import ViewAlignmentManager
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo, JointState
 from std_srvs.srv import Trigger, TriggerResponse
+from geometry_msgs.msg import Pose,Point,Quaternion
+import tf
 
 # WS stuff
 from soma_io.observation import *
 from soma_io.geometry import *
 from soma_io.state import World, Object
-import soma_io.geometry as ws_geom
 from world_modeling.srv import *
 
 # SOMA2 stuff
@@ -42,58 +43,28 @@ from vision_people_logging.msg import LoggingUBD
 from human_trajectory.msg import Trajectories
 
 import uuid
-
 import python_pcd
 
-talk = True
 
-class StoredView(MongoDocument):
-    def __init__(self, mongo=None):
-        super(StoredView, self).__init__()
-        if mongo is not None:
-            # this will create the document live..
-            self._connect(mongo)
-        self.id = None
-        self.point_cloud = None
-        self.rgb_image = None
-        self.robot_pose = None
-        self.camera_info = None
-        self.tf = None
-        self.view_episode_id = None
 
-    @classmethod
-    def _mongo_encode(cls, class_object):
-        doc = {}
-        doc.update(class_object.__dict__)
-        try:
-            doc.pop("_MongoDocument__mongo")
-            doc.pop("_MongoDocument__connected")
-        except KeyError:
-            print "Warning: no no no"
-        doc["__pyobject_class_type"] = class_object.get_pyoboject_class_string()
-        doc = copy.deepcopy(doc)
-        return doc
 
 class WorldStateManager:
 
     def __init__(self,db_hostname,db_port):
         rospy.init_node('world_state_modeling', anonymous = False)
         self.setup_clean = False
-        if(talk): rospy.loginfo("Manager Online")
-        # make a cluster tracker
+        rospy.loginfo("Manager Online")
+        # make a segment tracker
         rospy.loginfo("looking for camera info topic")
 
         self.world_model = World(server_host=db_hostname,server_port=int(db_port))
-        if(talk): rospy.loginfo("world model done")
+        rospy.loginfo("world model done")
 
-        self.cluster_tracker = SOMAClusterTracker()
+        self.segment_tracker = SegmentProcessor()
         self.pending_obs = []
         self.cur_sequence_obj_ids = []
         self.cur_view_soma_ids = []
         self.cur_observation_data = None
-
-        ## set up things for the view store ##
-        self.view_store = MongoConnection("surface_view_store", db_hostname, int(db_port))
 
         rospy.loginfo("setting up services")
         update_world_state = rospy.Service('update_world_model',WorldUpdate,self.object_segment_callback)
@@ -123,6 +94,19 @@ class WorldStateManager:
         rospy.loginfo("setting up view alignment manager")
         self.view_alignment_manager = ViewAlignmentManager()
 
+        rospy.loginfo("getting LLSD services")
+        rospy.wait_for_service('/soma_llsd/insert_scene')
+        self.view_store_insert = rospy.ServiceProxy('/soma_llsd/insert_scene',InsertScene)
+
+        rospy.wait_for_service('/soma_llsd/get_segment')
+        self.get_segment = rospy.ServiceProxy('/soma_llsd/get_segment',GetSegment)
+
+        rospy.wait_for_service('/soma_llsd/insert_segment')
+        self.insert_segment = rospy.ServiceProxy('/soma_llsd/insert_segment',InsertSegment)
+
+        rospy.wait_for_service('/soma_llsd/add_observations_to_segment')
+        self.append_obs_to_segment = rospy.ServiceProxy('/soma_llsd/add_observations_to_segment',AddObservationsToSegment)
+
         self.clean_up_obs()
 
         rospy.loginfo("-- node setup completed --")
@@ -144,24 +128,9 @@ class WorldStateManager:
         self.pending_obs = []
         self.cur_sequence_obj_ids = []
         self.cur_view_soma_ids = []
-        self.cluster_tracker.reset()
-        self.view_episode_id = str(uuid.uuid4())
+        self.segment_tracker.reset()
+        self.cur_episode_id = str(uuid.uuid4())
 
-        try:
-            # TODO: have to hack this due to issue with world_model code I'd rather not touch for now
-            query = {'_life_end': None}
-            db = self.world_model._mongo.database.Objects.find({"__pyobject_class_type": Object.get_pyoboject_class_string(),'_life_end': None,})
-            if(db):
-                for d in db:
-                    # uh well, this is weird? can't acces the object directly from this query
-                    # but can if I request it through the model
-                    # TODO: fix this insanity
-                    wo = self.world_model.get_object(d.key)
-                    rospy.loginfo("cut object: " + d.key)
-                    wo.cut()
-        except Exception,e:
-            rospy.logerr("Failed to clean up obs due to DB error")
-            rospy.logerr(e)
 
     def begin_obs(self,req):
         rospy.loginfo("-- received signal to begin sequence of observations --")
@@ -179,7 +148,7 @@ class WorldStateManager:
         self.do_postprocessing()
         return TriggerResponse(True,"Observations Ending: Assuming all previous observations were from the same sequence.")
 
-    def get_camera_info_topic_as_string(self):
+    def get_camera_info_topic(self):
         camera_msg = None
         try:
             camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/sw_registered/camera_info",  CameraInfo, timeout=2)
@@ -256,7 +225,7 @@ class WorldStateManager:
             cur_soma_person.waypoint = self.cur_waypoint
 
             # either way we want to record this, so just do it here?
-            #cur_soma_person.cloud = cur_scene_cluster.segmented_pc_mapframe
+            #cur_soma_person.cloud = cur_scene_segment_instance.segmented_pc_mapframe
 
             if person_idx != '':
                 cur_soma_person.pose = people_tracker_output.poses[person_idx]
@@ -275,34 +244,30 @@ class WorldStateManager:
         print("-- flushing observation from dataset through system --")
         self.process_cloud(data['cloud'],data['data'][3],data)
 
-    def create_view_store_msg(self,data):
-        message_proxy = MessageStoreProxy(collection="surface_view_store")
-        msg_id = message_proxy.insert(data)
-        pc_msg = MessageStoreObject(
-            database=message_proxy.database,
-            collection=message_proxy.collection,
-            obj_id=msg_id,
-            typ=data._type)
-        return pc_msg
-
-    def place_in_view_store(self,cloud,extra_data=None):
+    def register_with_view_store(self,cloud,extra_data=None):
         try:
             if(self.cur_observation_data is None):
-                self.get_observation_data(cloud,extra_data)
+                self.populate_observation_data(cloud,extra_data)
 
-            new_view = StoredView()
-            new_view.point_cloud = self.create_view_store_msg(cloud)
-            new_view.id = str(uuid.uuid4())
-            new_view.rgb_image = self.create_view_store_msg(self.cur_observation_data['rgb_image'])
-            new_view.robot_pose = self.create_view_store_msg(self.cur_observation_data['robot_pose'])
-            new_view.camera_info = self.create_view_store_msg(self.cur_observation_data['camera_info'])
-            new_view.tf = self.create_view_store_msg(self.cur_observation_data['tf'])
-            new_view.view_episode_id = self.view_episode_id;
-            new_id = self.view_store.database.views.insert(StoredView._mongo_encode(new_view))
-            new_view.id = new_id
 
-        #    new_view._connect(self.view_store)
-            rospy.loginfo("successfully added view to view store")
+            # INSERT INTO THE VIEW STORE
+            scene = self.view_store_insert(self.cur_episode_id,
+            self.cur_observation_data['waypoint'],
+            "{}", # meta_data
+            self.cur_observation_data['timestamp'],
+            self.cur_observation_data['tf'],
+            self.cur_observation_data['scene_cloud'],
+            self.cur_observation_data['rgb_image'],
+            self.cur_observation_data['depth_image'],
+            self.cur_observation_data['camera_info'],
+            self.cur_observation_data['robot_pose'])
+
+            if(scene.result is True):
+                rospy.loginfo("successfully added scene to view store")
+                self.cur_scene_id = scene.response.id
+            else:
+                rospy.logerr("couldn't add scene to view store, this is catastrophic")
+
         except Exception,e:
             rospy.loginfo("failed to add view to view store")
 
@@ -310,11 +275,13 @@ class WorldStateManager:
     def process_cloud(self,cloud,waypoint,extra_data=None):
         try:
             rospy.loginfo("---- Storing view in View Store ----")
-            self.get_observation_data(cloud,extra_data)
-            self.place_in_view_store(cloud)
+            self.cur_waypoint = waypoint
+            self.populate_observation_data(cloud,extra_data)
+            self.register_with_view_store(cloud)
+
 
             rospy.loginfo("---- Segmenting Scene ----")
-            scene = self.cluster_tracker.add_unsegmented_scene(cloud,extra_data)
+            scene = self.segment_tracker.add_unsegmented_scene(self.cur_observation_data,extra_data)
             if(scene.clean_setup is True):
 
                 scene.waypoint = waypoint
@@ -327,7 +294,7 @@ class WorldStateManager:
                 else:
                     rospy.logwarn("Object recognition service not found, try restarting is the node running?")
 
-                self.assign_clusters(scene,self.cluster_tracker.prev_scene,extra_data)
+                self.assign_segments(scene,self.segment_tracker.prev_scene,extra_data)
                 self.pending_obs.append(scene)
 
                 rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
@@ -364,47 +331,18 @@ class WorldStateManager:
             rospy.loginfo("-- no segments found in this scene, or if they were they were filtered out by the SOMA region or height filters ")
 
         for object_id in self.cur_sequence_obj_ids:
-            soma_objects = self.get_soma_objects_with_id(object_id)
-            rospy.loginfo("attempting to process object: " + str(object_id))
+            soma_object = self.get_soma_objects_with_id(object_id)
+            segment = self.get_segment(object_id)
 
-            # should be impossible, but just in case
-
-            if(not soma_objects.objects[0]):
-                rospy.loginfo("SOMA object doesn't exist")
-                continue
-            else:
-                rospy.loginfo("got this SOMA object")
-
-            if(not self.world_model.does_object_exist(object_id)):
-                rospy.logerr("WORLD object doesn't exist")
-                continue
-
-            try:
-                world_object = self.world_model.get_object(object_id)
-            except rospy.ServiceException, e:
-                rospy.logerr("DB ERROR")
-                continue
-
-            observations = world_object._observations
+            observations = segment.observations
             rospy.loginfo("observations for " + str(object_id) + " = " + str(len(observations)))
             if(len(observations) >= 2):
                 rospy.loginfo("processing...")
                 # update world model
                 try:
                     rospy.loginfo("updating world model")
-                    merged_cloud = self.view_alignment_manager.register_views(observations)
-                    rospy.loginfo("got merged cloud, putting it into the message store")
-                    message_proxy = MessageStoreProxy(collection="ws_merged_aligned_clouds")
-                    msg_id = message_proxy.insert(merged_cloud)
-                    mso = MessageStoreObject(
-                        database=message_proxy.database,
-                        collection=message_proxy.collection,
-                        obj_id=msg_id,
-                        typ=merged_cloud._type)
-                    world_object._point_cloud = mso
-
-                    # update SOMA
-                    rospy.loginfo("updating SOMA obj itself")
+                    merged_cloud = self.view_alignment_manager.register_views(segment)
+                    rospy.loginfo("updating SOMA obj")
                     soma_objects.objects[0].cloud = merged_cloud
 
                     self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
@@ -415,48 +353,17 @@ class WorldStateManager:
             else:
                 rospy.loginfo("not running view alignment, only one view")
 
-            rospy.loginfo("attempting to update object's recognition label")
-
-            try:
-                soma_objects.objects[0].type = str(world_object.label)
-                self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
-                rospy.loginfo("done! this object recognised as a " + str(world_object.label) + " with confidence: " + str(world_object.label_confidence))
-            except Exception,e:
-                rospy.logerr("Problem updating SOMA object label.")
-                rospy.logerr(e)
+            #rospy.loginfo("attempting to update object's recognition label")
+            #try:
+            #    soma_objects.objects[0].type = str(world_object.label)
+            #    self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
+            #    rospy.loginfo("done! this object recognised as a " + str(world_object.label) + " with confidence: " + str(world_object.label_confidence))
+            #except Exception,e:
+            #    rospy.logerr("Problem updating SOMA object label.")
+            #    rospy.logerr(e)
 
         rospy.loginfo("post-processing complete")
 
-
-    def cluster_is_live(self,cluster_id,waypoint):
-        if(talk): rospy.loginfo("seeing if object exists:" + str(cluster_id) +" in: " + waypoint)
-        exists = self.world_model.does_object_exist(cluster_id)
-        db = self.world_model._mongo.database.Objects.find({"__pyobject_class_type": Object.get_pyoboject_class_string(),'key': cluster_id,})
-        if(db):
-            print("uhhh i got something")
-            if(db.count() != 0):
-                print("True!")
-                return True
-            else:
-                print("False!")
-                return False
-        else:
-            print("i didn't get anything")
-
-
-        #if(exists):
-        #    live_objects = map(lambda x: x.name, self.world_model.get_children(waypoint, {'_life_end': None,}))
-        #    if(talk): rospy.loginfo("live objects:" + str(live_objects))
-        #    if(talk): rospy.loginfo("cid: " + str(cluster_id))
-        #    if(cluster_id in live_objects):
-        #        if(talk): rospy.loginfo("it does!")
-        #        return True
-
-        if(talk): rospy.loginfo("nope")
-        return False
-
-    def cluster_exists(self,cluster_id):
-        return self.world_model.does_object_exist(cluster_id)
 
     def add_soma_object(self,obj):
         rospy.loginfo("getting service")
@@ -485,30 +392,20 @@ class WorldStateManager:
 
         return response
 
-    def get_observation_data(self,scene,extra_data=None):
+    def populate_observation_data(self,scene,extra_data=None):
         self.cur_observation_data = {}
         if(extra_data is None):
             rospy.loginfo("*** Making observation using live robot data")
             try:
-                self.camera_info_topic = self.get_camera_info_topic_as_string()
+                self.camera_info_topic = self.get_camera_info_topic()
                 self.cur_observation_data['rgb_image'] = rospy.wait_for_message("/head_xtion/rgb/image_rect_color", Image, timeout=10.0)
+                self.cur_observation_data['depth_image'] = rospy.wait_for_message("/head_xtion/depth/image_rect", Image, timeout=10.0)
                 self.cur_observation_data['camera_info'] = rospy.wait_for_message(self.camera_info_topic, CameraInfo, timeout=10.0)
                 self.cur_observation_data['scene_cloud'] = scene.unfiltered_cloud
-                #self.cur_observation_data['ptu_state'] = rospy.wait_for_message("/ptu/state", JointState, timeout=10.0)
+                self.cur_observation_data['waypoint'] = self.cur_waypoint
+                self.cur_observation_data['timestamp'] = int(rospy.Time.now().to_sec())
                 self.cur_observation_data['robot_pose'] = rospy.wait_for_message("/robot_pose", geometry_msgs.msg.Pose, timeout=10.0)
-
-                transforms = TransformationStore.create_live()
-                rospy.sleep(1) # drink in some TF
-                tf_data =  transforms.pickle_to_msg()
-                msg_id = message_proxy.insert(tf_data)
-                tf_store  = MessageStoreObject(
-                    database=message_proxy.database,
-                    collection=message_proxy.collection,
-                    obj_id=msg_id,
-                    typ=tf_data._type)
-
-                self.cur_observation_data['tf'] = tf_store
-
+                self.cur_observation_data['tf'] = rospy.wait_for_message("/tf", TFMessage, timeout=10.0)
             except rospy.ROSException, e:
                 rospy.logwarn("Failed to get some observation data")
                 rospy.logwarn(e)
@@ -520,21 +417,14 @@ class WorldStateManager:
                 self.cur_observation_data['robot_pose'] = extra_data['robot_pose']
                 self.cur_observation_data['metadata'] = extra_data['data']
                 self.cur_observation_data['tf'] = extra_data['tf']
+                self.cur_observation_data['depth_image'] = extra_data['depth_image']
+
         return self.cur_observation_data
 
-    def assign_clusters(self,scene,prev_scene,extra_data=None):
-        if(talk): rospy.loginfo("assigning")
+    def assign_segments(self,scene,prev_scene,extra_data=None):
+        rospy.loginfo("assigning")
         cur_scene = scene
         self.cur_view_soma_ids = []
-
-
-
-
-        if(talk): rospy.loginfo("waiting for insert service")
-
-        rospy.wait_for_service('/message_store/insert')
-
-        if(talk): rospy.loginfo("gotcha")
 
         # if this is not scene 0, ie. we have a previous scene to compare to
         if not prev_scene:
@@ -545,99 +435,70 @@ class WorldStateManager:
             rospy.loginfo("did segmentation fail?")
             return
 
-        for cur_scene_cluster in cur_scene.cluster_list:
+        # we iterate over the INSTANCES OF segmentS visible in the current scene
+        # and see if we can link them to previously seen segments in prior views
+        for cur_scene_segment_instance in cur_scene.segment_list:
 
-            cur_cluster = None
+            # this object is a Segment in the database
+            # whereas cur_scene_segment_instance is an instance of a segment in memory in the current view
+            target_db_segment = None
 
+            # if there are previous views to look at it
             if(prev_scene):
-                rospy.loginfo("seeing if prev scene contains: " + str(cur_scene_cluster.cluster_id))
-                for pc in prev_scene.cluster_list:
-                    rospy.loginfo(pc.cluster_id)
-                if(prev_scene.contains_cluster_id(cur_scene_cluster.cluster_id)):
-                    # do we have a living world model for this cluster already?
-                    if(self.cluster_is_live(cur_scene_cluster.cluster_id,cur_scene.waypoint)):
-                        #   fetch the world_model for the cluster
-                        if(talk): rospy.loginfo("got existing object")
-                        rospy.loginfo("getting EXISTING cluster with id: " + cur_scene_cluster.cluster_id)
-                        cur_cluster = self.world_model.get_object(cur_scene_cluster.cluster_id)
+                rospy.loginfo("seeing if prev scene contains: " + str(cur_scene_segment_instance.segment_id))
+                for pc in prev_scene.segment_list:
+                    rospy.loginfo(pc.segment_id)
 
-            if not cur_cluster:
-                if(talk): rospy.loginfo("creating NEW cluster with id: " + str(cur_scene_cluster.cluster_id))
-                cur_cluster = self.world_model.create_object(cur_scene_cluster.cluster_id)
-                cur_cluster._parent = cur_scene.waypoint
-                cur_cluster.label = "unknown"
-                cur_cluster.label_confidence = 0.0
-                self.cur_sequence_obj_ids.append(cur_scene_cluster.cluster_id)
+                if(prev_scene.contains_segment_id(cur_scene_segment_instance.segment_id)):
+                    rospy.loginfo("getting EXISTING segment")
+                    target_db_segment = self.get_segment(cur_scene_segment_instance.id)
+
+            # if this the first view, or a new segment
+            if not target_db_segment:
+                rospy.loginfo("creating NEW segment")
+
+                # inserting a blank segment linked to the current scene we're observing
+                request = self.insert_segment("{}",self.cur_scene_id,[])
+                if(request.result is False):
+                    rospy.logerr("Unable to insert segment, this is catastrophic")
+                    return
+
+                cur_scene_segment_instance.segment_id = request.response.id
+                target_db_segment = request.response
+                self.cur_sequence_obj_ids.append(target_db_segment.id)
 
             # from here we've either added this as a new object to the scene
             # or retreived the data for it in a previous scene
-            if(cur_cluster):
+            if(target_db_segment):
                 # so first add a new observation to it, in all cases
-                if(talk): rospy.loginfo("making observation")
+                rospy.loginfo("making observation")
                 # add an observation for the object
 
-                #DEFAULT_TOPICS = [("/head_xtion/rgb/image_rect_color", Image),
-                #                  (self.camera_info_topic, CameraInfo),
-                #                  ("/head_xtion/depth_registered/points", PointCloud2),
-                #                  ("/ptu/state", JointState),
-                #                  ("/robot_pose", geometry_msgs.msg.Pose)]
-                #cloud_observation = Observation.make_observation(DEFAULT_TOPICS)
+                new_segment_observation = Observation()
+                #new_segment_observation.id =  I'm ignoring this because if it's left blank, the service generates one for you
+                new_segment_observation.timestamp = self.cur_observation_data['timestamp'],
+                new_segment_observation.meta_data = "{}"
 
-                OBSERVATIONS = [("/head_xtion/rgb/image_rect_color",self.cur_observation_data['rgb_image']),
-                                ("/robot_pose",self.cur_observation_data['robot_pose']),
-                                ("/camera_info",self.cur_observation_data['camera_info']),
-                                ("/head_xtion/depth_registered/points",self.cur_observation_data['scene_cloud']),
-                                ("/tf",self.cur_observation_data['tf'])]
+                new_segment_observation.pose =  cur_scene_segment_instance.map_centroid # centroid in map co-ordinates
+                new_segment_observation.map_cloud =  cur_scene_segment_instance.segmented_pc_mapframe #segmented cloud in map co-ordinates
+                new_segment_observation.camera_cloud = cur_scene_segment_instance.segmented_pc_camframe # segmented  cloud in camera co-ordinates
+                new_segment_observation.room_cloud =   None # segmented cloud aligned to meta-room
 
-                cloud_observation = Observation.make_observation_from_messages(OBSERVATIONS)
+                new_segment_observation.rgb_cropped = cur_scene_segment_instance.cropped_image
+                new_segment_observation.depth_cropped = None
+                new_segment_observation.rgb_masked = cur_scene_segment_instance.rgb_mask
+                new_segment_observation.depth_masked = None
 
-
-
-                # centroid of this object
-                ws_pose = ws_geom.Pose()
-                ws_pose.position.x = cur_scene_cluster.map_centroid[0]
-                ws_pose.position.y = cur_scene_cluster.map_centroid[1]
-                ws_pose.position.z = cur_scene_cluster.map_centroid[2]
-
-                rospy.loginfo("observation made")
-
-                #if(talk): rospy.loginfo("POSE")
-                #if(talk): rospy.loginfo(pose.position)
-                cur_cluster.add_pose(ws_pose)
-
-                # store a bunch of image stuff about the cluster
-                cloud_observation.add_message(cur_scene_cluster.segmented_pc_mapframe,"object_cloud_mapframe")
-                cloud_observation.add_message(cur_scene_cluster.segmented_pc_camframe,"object_cloud_camframe")
-
-                message_proxy = MessageStoreProxy(collection="ws_observations")
-                msg_id = message_proxy.insert(cur_scene_cluster.segmented_pc_mapframe)
-                mso = MessageStoreObject(
-                    database=message_proxy.database,
-                    collection=message_proxy.collection,
-                    obj_id=msg_id,
-                    typ=cur_scene_cluster.segmented_pc_mapframe._type)
-
-                cur_cluster._point_cloud = mso
-                cur_cluster.view_episode_id = self.view_episode_id
-
-                cloud_observation.add_message(cur_scene_cluster.cropped_image,"image_cropped")
-                cloud_observation.add_message(cur_scene_cluster.rgb_mask,"rgb_mask")
-
-                if(extra_data is not None):
-                    cur_cluster._life_start = extra_data['data'][1]
-                    cur_cluster._life_end = extra_data['data'][0]
-
-                cur_cluster.add_observation(cloud_observation)
+                self.append_obs_to_segment(target_db_segment.id,[new_segment_observation])
 
                 cur_soma_obj = None
-
-                soma_objs = self.get_soma_objects_with_id(cur_cluster.key)
+                soma_objs = self.get_soma_objects_with_id(target_db_segment.id)
 
                 if(soma_objs.objects):
                     rospy.loginfo("soma has this object")
-                    # we have a soma object with this id
-                    # retrieve it
                     cur_soma_obj = soma_objs.objects[0]
+                    # nothing to do in this case?
+
                 else:
                     rospy.loginfo("soma doesn't have this object")
                     # if this object is unknown, lets register a new unknown object in SOMA2
@@ -645,57 +506,31 @@ class WorldStateManager:
                     # create it
                     try:
                         cur_soma_obj = SOMA2Object()
-                        cur_soma_obj.id = cur_cluster.key
+                        cur_soma_obj.id = target_db_segment.segment_id
                         cur_soma_obj.type = "unknown"
-                        cur_soma_obj.waypoint = cur_scene.waypoint
+                        cur_soma_obj.waypoint = self.cur_observation_data['waypoint']
 
                         # either way we want to record this, so just do it here?
-                        cur_soma_obj.cloud = cur_scene_cluster.segmented_pc_mapframe
+                        cur_soma_obj.cloud = new_segment_observation.map_cloud
+                        cur_soma_obj.pose = new_segment_observation.pose
 
-                        soma_pose = geometry_msgs.msg.Pose()
-                        soma_pose.position.x = cur_scene_cluster.map_centroid[0]
-                        soma_pose.position.y = cur_scene_cluster.map_centroid[1]
-                        soma_pose.position.z = cur_scene_cluster.map_centroid[2]
-
-                        cur_soma_obj.pose = soma_pose
                         if(extra_data is not None):
-                            cur_soma_obj.logtimestamp = int(float(cur_cluster._life_end)) # jesus christ
+                            cur_soma_obj.logtimestamp = self.cur_observation_data['timestamp'] # jesus christ
 
                         cur_soma_obj.sweepCenter = self.cur_observation_data['robot_pose']
 
-                        # TODO: everything is unknown for now, but later on we'll change this to a
-                        # class or instance distribution
                         rospy.loginfo("inserting into SOMA")
                         res = self.soma_insert([cur_soma_obj])
-                        #rospy.loginfo("result: ")
-                        #rospy.loginfo(res)
                     except Exception, e:
                         rospy.logerr("unable to insert into SOMA. Is the database server running?")
                         rospy.logerr(e)
 
                 # record all SOMA objects seen in this view
-                self.cur_view_soma_ids.append(cur_cluster.key)
+                self.cur_view_soma_ids.append(target_db_segment.id)
 
-                if(talk): rospy.loginfo("done")
-        # next we need to clean up the scene, and mark anything no longer observable
-        # as not live
-        if(prev_scene and cur_scene):
-            for prev_scene_cluster in prev_scene.cluster_list:
-                # if the cluster observed in the previous scene is not in the current scene
-                if not cur_scene.contains_cluster_id(prev_scene_cluster.cluster_id):
-                    if(talk): rospy.loginfo("cutting object from previous scene")
-                    # set the internal model to not live
-                    try:
-                        prev_cluster = self.world_model.get_object(prev_scene_cluster.cluster_id)
-                        prev_cluster.cut()
-                    except Exception, e:
-                        rospy.logerr("failed to cut object, is the database server OK?")
-                        rospy.logerr("restart of node possibly required")
+                rospy.loginfo("done")
 
-            else:
-                if(talk): rospy.loginfo("object still live, not cutting")
-
-        rospy.loginfo("World Update Complete")
+        rospy.loginfo("DB Update Complete")
         rospy.loginfo("")
 
 

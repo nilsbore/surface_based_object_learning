@@ -50,7 +50,9 @@
   <build_depend>soma_io</build_depend>
   <build_depend>observation_registration</build_depend>
   <build_depend>geometry_msgs</build_depend>
-
+  <build_depend>soma_llsd_msgs</build_depend>
+  <build_depend>tf2_ros</build_depend>
+  <build_depend>tf2_msgs</build_depend>
 
 
   <run_depend>rospy</run_depend>
@@ -63,7 +65,9 @@
   <run_depend>soma_io</run_depend>
   <run_depend>observation_registration</run_depend>
   <run_depend>geometry_msgs</run_depend>
-
+  <run_depend>soma_llsd_msgs</run_depend>
+  <run_depend>tf2_ros</run_depend>
+  <run_depend>tf2_msgs</run_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
