@@ -2,11 +2,6 @@
 import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField
-from world_modeling.srv import *
-from soma_io.observation import Observation, TransformationStore
-from soma_io.geometry import *
-from soma_io.state import World, Object
-from soma_io.observation import *
 # SOMA2 stuff
 from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
@@ -23,7 +18,7 @@ from shapely.geometry.polygon import Polygon
 import python_pcd
 import shapely.geometry
 from shapely.geometry import MultiPoint
-from world_modeling.srv import PointInROI
+from surface_based_object_learning.srv import PointInROI
 
 
 class ROIFilter:

@@ -491,7 +491,7 @@ class SegmentedScene:
                 x_start = 0
 
             do_luminance_filtering = False
-            
+
             if(do_luminance_filtering):
                 cur_segment.cv_rgb_image_cropped = cv_rgb_image[int(y_start):int(y_end), int(x_start):int(x_end)]
                 cur_segment.cropped_image = bridge.cv2_to_imgmsg(cur_segment.cv_rgb_image_cropped, encoding="bgr8")

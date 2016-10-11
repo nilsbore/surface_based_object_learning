@@ -1,4 +1,0 @@
-string id    # the ID of the thing being observed
-string waypoint     # the waypoint of the observation
----
-bool result         # whether the service succeded or failed

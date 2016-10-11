@@ -5,10 +5,6 @@ import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField
 from world_modeling.srv import *
-from soma_io.observation import Observation, TransformationStore
-from soma_io.geometry import *
-from soma_io.state import World, Object
-from soma_io.observation import *
 # SOMA2 stuff
 from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *

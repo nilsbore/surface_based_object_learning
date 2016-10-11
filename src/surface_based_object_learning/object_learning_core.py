@@ -25,10 +25,7 @@ from geometry_msgs.msg import Pose,Point,Quaternion
 import tf
 
 # WS stuff
-from soma_io.observation import *
-from soma_io.geometry import *
-from soma_io.state import World, Object
-from world_modeling.srv import *
+from surface_based_object_learning.srv import *
 
 # SOMA2 stuff
 from soma2_msgs.msg import SOMA2Object
@@ -37,28 +34,17 @@ from soma_manager.srv import *
 # recog stuff
 from recognition_srv_definitions.srv import *
 
-# people tracker stuff #
-from bayes_people_tracker.msg import PeopleTracker
-from vision_people_logging.msg import LoggingUBD
-from human_trajectory.msg import Trajectories
-
 import uuid
 import python_pcd
 
-
-
-
-class WorldStateManager:
+class LearningCore:
 
     def __init__(self,db_hostname,db_port):
-        rospy.init_node('world_state_modeling', anonymous = False)
+        rospy.init_node('surface_based_object_learning', anonymous = False)
         self.setup_clean = False
         rospy.loginfo("Manager Online")
         # make a segment tracker
         rospy.loginfo("looking for camera info topic")
-
-        self.world_model = World(server_host=db_hostname,server_port=int(db_port))
-        rospy.loginfo("world model done")
 
         self.segment_tracker = SegmentProcessor()
         self.pending_obs = []
@@ -67,13 +53,11 @@ class WorldStateManager:
         self.cur_observation_data = None
 
         rospy.loginfo("setting up services")
-        update_world_state = rospy.Service('update_world_model',WorldUpdate,self.object_segment_callback)
-        rospy.loginfo("world update service running")
-        update_person_state = rospy.Service('update_person_model',PersonUpdate,self.person_segment_callback)
-        rospy.loginfo("person update service running")
+        process_scene = rospy.Service('/surface_based_object_learning/process_scene',ProcessScene,self.object_segment_callback)
+        rospy.loginfo("scene processing service running")
 
-        begin_observations = rospy.Service('/begin_observations',Trigger,self.begin_obs)
-        end_observations = rospy.Service('/end_observations',Trigger,self.end_obs)
+        begin_observations = rospy.Service('/surface_based_object_learning/begin_observation_sequence',Trigger,self.begin_obs)
+        end_observations = rospy.Service('/surface_based_object_learning/end_observation_sequence',Trigger,self.end_obs)
 
         rospy.loginfo("setting up SOMA services")
         rospy.loginfo("getting SOMA insert service")
@@ -113,15 +97,6 @@ class WorldStateManager:
         self.setup_clean = True
 
         #rospy.spin()
-
-    def person_segment_callback(self,req):
-        if(self.setup_clean is False):
-            rospy.loginfo("-- world_modeling node is missing one or more key services, cannot act --")
-        else:
-            pid = req.id
-            self.cur_waypoint = req.waypoint
-            self.assign_people(pid)
-            return PersonUpdateResponse(True)
 
     def clean_up_obs(self):
         rospy.loginfo("running cleanup")
@@ -164,80 +139,6 @@ class WorldStateManager:
                 rospy.loginfo("couldn't find /head_xtion/depth_registered/camera_info")
 
         return None
-
-    def assign_people(self,pid):
-        rospy.loginfo("assigning")
-        # do we have a low-level object with this key?
-            # if so get it out
-            # if not, create it
-        exists = self.world_model.does_object_exist(pid)
-        cur_person = None
-
-        if(exists):
-            cur_person = self.world_model.get_object(pid)
-
-        if(not cur_person):
-            rospy.loginfo("creating person entry")
-            cur_person = self.world_model.create_object(pid)
-            cur_person._parent = self.cur_waypoint
-        else:
-            rospy.loginfo("got this person already")
-
-
-        # record this observation
-        DEFAULT_TOPICS = [("/vision_logging_service/log", LoggingUBD),
-                          ("/people_trajectory/trajectories/batch", Trajectories),
-                          ("/robot_pose", geometry_msgs.msg.Pose),
-                          ("/people_tracker/positions", PeopleTracker)]
-
-
-
-        person_observation = Observation.make_observation(DEFAULT_TOPICS)
-        cur_person.add_observation(person_observation)
-
-
-        people_tracker_output = person_observation.get_message("/people_tracker/positions")
-        # get the idx of the thing we want
-        person_idx = ''
-        try:
-            person_idx = people_tracker_output.uuids.index(pid)
-        except:
-            rospy.logwarn(
-                "Can not capture %s information, the person has gone" % pid
-            )
-
-        soma_objs=self.get_soma_objects_with_id(cur_person.key)
-        cur_soma_person = None
-
-        if(soma_objs.objects):
-            rospy.loginfo("soma has this person")
-            # we have a soma object with this id
-            # retrieve it
-            cur_soma_person = soma_objs.objects[0] # will only ever return 1 anyway, as keys are unique
-        else:
-            rospy.loginfo("soma doesn't have this person")
-            # if this object is unknown, lets register a new unknown object in SOMA2
-            # we do not have a soma object with this id
-            # create it
-            cur_soma_person = SOMA2Object()
-            cur_soma_person.id = cur_person.key
-            cur_soma_person.type = "person"
-            cur_soma_person.waypoint = self.cur_waypoint
-
-            # either way we want to record this, so just do it here?
-            #cur_soma_person.cloud = cur_scene_segment_instance.segmented_pc_mapframe
-
-            if person_idx != '':
-                cur_soma_person.pose = people_tracker_output.poses[person_idx]
-
-            msg = rospy.wait_for_message("/robot_pose",  geometry_msgs.msg.Pose, timeout=3.0)
-            cur_soma_person.sweepCenter = msg
-
-            rospy.loginfo("inserting person detection into SOMA")
-            res = self.soma_insert([cur_soma_person])
-
-        # update this object in some way
-        # TODO: HOW?
 
 
     def flush_observation(self,data):
@@ -299,7 +200,7 @@ class WorldStateManager:
 
                 rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
 
-                return WorldUpdateResponse(True,self.cur_view_soma_ids)
+                return ProcessSceneResponse(True,self.cur_view_soma_ids)
             else:
                 rospy.loginfo("Error in processing scene")
 
@@ -308,9 +209,9 @@ class WorldStateManager:
             rospy.logerr(e)
 
     def object_segment_callback(self, req):
-        result = WorldUpdateResponse(False,self.cur_view_soma_ids)
+        result = ProcessSceneResponse(False,self.cur_view_soma_ids)
         if(self.setup_clean is False):
-            rospy.logerr("-- world_modeling node is missing one or more key services, cannot act --")
+            rospy.logerr("-- surface_based_object_learning node is missing one or more key services, cannot act --")
             rospy.logerr("-- run services and then re-start me --")
             return result
         else:
@@ -548,4 +449,4 @@ if __name__ == '__main__':
         port = str(vars(args)['db_port'][0])
 
         rospy.loginfo("got db_hostname as: " + hostname + " got db_port as: " + port)
-        world_state_manager = WorldStateManager(hostname,port)
+        world_state_manager = LearningCore(hostname,port)

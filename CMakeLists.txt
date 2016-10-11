@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(world_modeling)
+project(surface_based_object_learning)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -57,8 +57,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate services in the 'srv' folder
  add_service_files(
    FILES
-    WorldUpdate.srv
-    PersonUpdate.srv
+    ProcessScene.srv
     PointInROI.srv
 #   Service2.srv
  )
@@ -106,19 +105,19 @@ include_directories(
 )
 
 ## Declare a cpp library
-# add_library(world_modeling
-#   src/${PROJECT_NAME}/world_modeling.cpp
+# add_library(surface_based_object_learning
+#   src/${PROJECT_NAME}/surface_based_object_learning.cpp
 # )
 
 ## Declare a cpp executable
-# add_executable(world_modeling_node src/world_modeling_node.cpp)
+# add_executable(surface_based_object_learning_node src/surface_based_object_learning_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(world_modeling_node world_modeling_generate_messages_cpp)
+# add_dependencies(surface_based_object_learning_node surface_based_object_learning_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(world_modeling_node
+# target_link_libraries(surface_based_object_learning_node
 #   ${catkin_LIBRARIES}
 # )
 
@@ -137,7 +136,7 @@ include_directories(
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS world_modeling world_modeling_node
+# install(TARGETS surface_based_object_learning surface_based_object_learning_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -162,7 +161,7 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_world_modeling.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_surface_based_object_learning.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
