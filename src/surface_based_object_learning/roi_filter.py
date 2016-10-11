@@ -54,16 +54,13 @@ class ROIFilter:
         self.soma_polygons = []
         #rospy.loginfo("ROI TYPES: ")
         for roi in response.rois:
-
-
+            rospy.loginfo(roi.type)
             if("NavArea" in roi.type):
                 #rospy.loginfo(roi.type+" \t SKIPPING")
                 continue
             if("Human" in roi.type):
                 #rospy.loginfo(roi.type+" \t SKIPPING")
                 continue
-
-            #rospy.loginfo(roi.type+" \t ACCEPTING")
 
             points = roi.posearray.poses
             points_2d = []
@@ -113,10 +110,12 @@ class ROIFilter:
 
     def accel_point_in_roi(self,point_in):
         point = shapely.geometry.Point(point_in[0],point_in[1])
+        poly = None
         for polygon in self.soma_polygons:
             if(polygon.contains(point)):
-                return True
-        return False
+                poly = polygon
+                return True,poly
+        return False,None
 
     def accel_any_point_in_roi(self,cloud_in):
 

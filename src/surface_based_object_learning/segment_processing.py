@@ -367,7 +367,7 @@ class SegmentedScene:
 
                 # here we check to make sure the object has at least one point in a SOMa ROI
                 if(sc_roi_check is False):
-                    pir = roi_filter.accel_point_in_roi([pt_s.point.x,pt_s.point.y])
+                    pir,poly = roi_filter.accel_point_in_roi([pt_s.point.x,pt_s.point.y])
                     if(pir):
                         sc_roi_check = True
                         points_in_roi+=1
@@ -396,7 +396,7 @@ class SegmentedScene:
                 rospy.loginfo("Not enough of object in ROI to continue")
                 continue
             else:
-                rospy.loginfo("Object overlaps ROI")
+                rospy.loginfo("Object is in ROI")
 
             x /= len(cur_segment.data)
             y /= len(cur_segment.data)
@@ -490,52 +490,55 @@ class SegmentedScene:
             if(x_start < 0):
                 x_start = 0
 
-            cur_segment.cv_rgb_image_cropped = cv_rgb_image[int(y_start):int(y_end), int(x_start):int(x_end)]
-            cur_segment.cropped_image = bridge.cv2_to_imgmsg(cur_segment.cv_rgb_image_cropped, encoding="bgr8")
-            cur_segment.rgb_image_mask = bridge.cv2_to_imgmsg(rgb_image_mask, encoding="bgr8")
+            do_luminance_filtering = False
+            
+            if(do_luminance_filtering):
+                cur_segment.cv_rgb_image_cropped = cv_rgb_image[int(y_start):int(y_end), int(x_start):int(x_end)]
+                cur_segment.cropped_image = bridge.cv2_to_imgmsg(cur_segment.cv_rgb_image_cropped, encoding="bgr8")
+                cur_segment.rgb_image_mask = bridge.cv2_to_imgmsg(rgb_image_mask, encoding="bgr8")
 
-            hsv = cv2.cvtColor(cur_segment.cv_rgb_image_cropped_unpadded, cv2.COLOR_BGR2YUV)
+                hsv = cv2.cvtColor(cur_segment.cv_rgb_image_cropped_unpadded, cv2.COLOR_BGR2YUV)
 
-            avg_luma = 0
-            for pixel in hsv:
-                luma = pixel[0]
-                avg_luma += luma[0]
-                avg_luma += luma[1]
-                avg_luma += luma[2]
+                avg_luma = 0
+                for pixel in hsv:
+                    luma = pixel[0]
+                    avg_luma += luma[0]
+                    avg_luma += luma[1]
+                    avg_luma += luma[2]
 
-            avg_luma /= len(hsv)
-            print("AVG LUMA: " + str(avg_luma))
+                avg_luma /= len(hsv)
+                print("AVG LUMA: " + str(avg_luma))
 
-            al = 0
-            h,w,bpp = np.shape(cur_segment.cv_rgb_image_cropped_unpadded)
-            pc = 0
-            for py in range(0,h):
-                for px in range(0,w):
-                    pixel = cur_segment.cv_rgb_image_cropped_unpadded[py][px]
-                    r = pixel[2]
-                    g = pixel[1]
-                    b = pixel[0]
-                    lm = 0.299*r + 0.587*g + 0.144*b
-                    al+=lm
-                    pc+=1
+                al = 0
+                h,w,bpp = np.shape(cur_segment.cv_rgb_image_cropped_unpadded)
+                pc = 0
+                for py in range(0,h):
+                    for px in range(0,w):
+                        pixel = cur_segment.cv_rgb_image_cropped_unpadded[py][px]
+                        r = pixel[2]
+                        g = pixel[1]
+                        b = pixel[0]
+                        lm = 0.299*r + 0.587*g + 0.144*b
+                        al+=lm
+                        pc+=1
 
-            un_px = len(unique_rgb)
-            print("PIXELS: " + str(pc))
-            print("UNIQUE PIXELS: " + str(un_px))
-            print("SUM LUMA: " + str(al))
-            al /= pc
-            print("AVG LUMA: " + str(al))
+                un_px = len(unique_rgb)
+                print("PIXELS: " + str(pc))
+                print("UNIQUE PIXELS: " + str(un_px))
+                print("SUM LUMA: " + str(al))
+                al /= pc
+                print("AVG LUMA: " + str(al))
 
-            #f = cv2.imwrite("obj_segments_image/pixels/"+str(int(un_px))+'.jpeg',cur_segment.cv_rgb_image_cropped_unpadded)
-            #print("done writing")
-            #print(f)
-            #cv2.imwrite("obj_segments_image/luma/"+str(int(al))+'.jpeg',cur_segment.cv_rgb_image_cropped_unpadded)
+                #f = cv2.imwrite("obj_segments_image/pixels/"+str(int(un_px))+'.jpeg',cur_segment.cv_rgb_image_cropped_unpadded)
+                #print("done writing")
+                #print(f)
+                #cv2.imwrite("obj_segments_image/luma/"+str(int(al))+'.jpeg',cur_segment.cv_rgb_image_cropped_unpadded)
 
-            if(al > 50 and un_px > 1800 and un_px < 15000):
-                print("object meets our criteria!")
-            else:
-                print("ignoring this object, looks like garbage!")
-                continue
+                if(al > 50 and un_px > 1800 and un_px < 15000):
+                    print("object meets our luminance criteria!")
+                else:
+                    print("ignoring this object, looks like garbage!")
+                    continue
 
             #f = cv2.imwrite('obj_segments_image/aaa_CROPPED.jpeg',cur_segment.cv_rgb_image_cropped_unpadded)
             #print(f)
@@ -609,10 +612,14 @@ class SegmentProcessor:
 
         segment_response = self.segment_scene(observation_data['scene_cloud'])
 
+        # this might be different to what is in the raw observation message
+        # as we may do things like cut it off after a certain distance etc.
+        # during segmentation
         working_cloud = observation_data['scene_cloud']
+
+        # this is pretty standard, we need the indices of the clusters
         indices = segment_response.clusters_indices
         rospy.loginfo("found:" + str(len(indices)) + " clusters")
-
         rospy.loginfo("segmentation done")
         new_scene = SegmentedScene(indices,working_cloud,observation_data,self.roi_filter,offline_data)
 

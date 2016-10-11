@@ -34,5 +34,5 @@ def look_at_table():
 if __name__ == '__main__':
     rospy.init_node('nudge_ptu', anonymous = True)
     reset_gaze()
-#    look_at_table()
+    look_at_table()
 #    rospy.spin()
