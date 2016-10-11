@@ -22,14 +22,17 @@ from view_registration import ViewAlignmentManager
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo, JointState
 from std_srvs.srv import Trigger, TriggerResponse
 from geometry_msgs.msg import Pose,Point,Quaternion
-import tf
+import tf2_ros
+import tf, tf2_msgs.msg
 
 # WS stuff
 from surface_based_object_learning.srv import *
+from util import TransformationStore
 
 # SOMA2 stuff
 from soma2_msgs.msg import SOMA2Object
 from soma_manager.srv import *
+from soma_llsd.srv import *
 
 # recog stuff
 from recognition_srv_definitions.srv import *
@@ -46,14 +49,14 @@ class LearningCore:
         # make a segment tracker
         rospy.loginfo("looking for camera info topic")
 
-        self.segment_tracker = SegmentProcessor()
+        self.segment_processor = SegmentProcessor()
         self.pending_obs = []
         self.cur_sequence_obj_ids = []
         self.cur_view_soma_ids = []
         self.cur_observation_data = None
 
         rospy.loginfo("setting up services")
-        process_scene = rospy.Service('/surface_based_object_learning/process_scene',ProcessScene,self.object_segment_callback)
+        process = rospy.Service('/surface_based_object_learning/process_scene',ProcessScene,self.process_scene_callback)
         rospy.loginfo("scene processing service running")
 
         begin_observations = rospy.Service('/surface_based_object_learning/begin_observation_sequence',Trigger,self.begin_obs)
@@ -96,15 +99,17 @@ class LearningCore:
         rospy.loginfo("-- node setup completed --")
         self.setup_clean = True
 
-        #rospy.spin()
+        rospy.spin()
 
     def clean_up_obs(self):
         rospy.loginfo("running cleanup")
         self.pending_obs = []
         self.cur_sequence_obj_ids = []
         self.cur_view_soma_ids = []
-        self.segment_tracker.reset()
+        self.cur_observation_data = None
+        self.segment_processor.reset()
         self.cur_episode_id = str(uuid.uuid4())
+        rospy.loginfo("-- new episode id: " + self.cur_episode_id)
 
 
     def begin_obs(self,req):
@@ -143,7 +148,7 @@ class LearningCore:
 
     def flush_observation(self,data):
         print("-- flushing observation from dataset through system --")
-        self.process_cloud(data['cloud'],data['data'][3],data)
+        self.process_scene(data['cloud'],data['data'][3],data)
 
     def register_with_view_store(self,cloud,extra_data=None):
         try:
@@ -173,42 +178,42 @@ class LearningCore:
             rospy.loginfo("failed to add view to view store")
 
 
-    def process_cloud(self,cloud,waypoint,extra_data=None):
-        try:
-            rospy.loginfo("---- Storing view in View Store ----")
-            self.cur_waypoint = waypoint
-            self.populate_observation_data(cloud,extra_data)
-            self.register_with_view_store(cloud)
+    def process_scene(self,cloud,waypoint,extra_data=None):
+        #try:
+        rospy.loginfo("---- Storing view in View Store ----")
+        self.cur_waypoint = waypoint
+        self.populate_observation_data(cloud,extra_data)
+        self.register_with_view_store(cloud)
 
 
-            rospy.loginfo("---- Segmenting Scene ----")
-            scene = self.segment_tracker.add_unsegmented_scene(self.cur_observation_data,extra_data)
-            if(scene.clean_setup is True):
+        rospy.loginfo("---- Segmenting Scene ----")
+        scene = self.segment_processor.add_unsegmented_scene(self.cur_observation_data,extra_data)
+        if(scene.clean_setup is True):
 
-                scene.waypoint = waypoint
+            scene.waypoint = waypoint
 
-                if(self.recog_manager):
-                    rospy.loginfo("---- Running Object Recognition ----")
-                    recognition = self.recog_manager.recognise_scene(cloud)
-                    if(recognition is True):
-                        self.recog_manager.assign_labels(scene)
-                else:
-                    rospy.logwarn("Object recognition service not found, try restarting is the node running?")
-
-                self.assign_segments(scene,self.segment_tracker.prev_scene,extra_data)
-                self.pending_obs.append(scene)
-
-                rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
-
-                return ProcessSceneResponse(True,self.cur_view_soma_ids)
+            if(self.recog_manager):
+                rospy.loginfo("---- Running Object Recognition ----")
+                recognition = self.recog_manager.recognise_scene(cloud)
+                if(recognition is True):
+                    self.recog_manager.assign_labels(scene)
             else:
-                rospy.loginfo("Error in processing scene")
+                rospy.logwarn("Object recognition service not found, try restarting is the node running?")
 
-        except Exception,e:
-            rospy.logerr("Unable to segment and process this scene")
-            rospy.logerr(e)
+            self.assign_segments(scene,self.segment_processor.prev_scene,extra_data)
+            self.pending_obs.append(scene)
 
-    def object_segment_callback(self, req):
+            rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
+
+            return ProcessSceneResponse(True,self.cur_view_soma_ids)
+        else:
+            rospy.loginfo("Error in processing scene")
+
+        #except Exception,e:
+        #    rospy.logerr("Unable to segment and process this scene")
+        #    rospy.logerr(e)
+
+    def process_scene_callback(self, req):
         result = ProcessSceneResponse(False,self.cur_view_soma_ids)
         if(self.setup_clean is False):
             rospy.logerr("-- surface_based_object_learning node is missing one or more key services, cannot act --")
@@ -221,7 +226,7 @@ class LearningCore:
                 rospy.logwarn("-- Stopping Processing ---")
                 return result
 
-            result = self.process_cloud(req.input,req.waypoint)
+            result = self.process_scene(req.input,req.waypoint)
 
             return result
 
@@ -302,11 +307,19 @@ class LearningCore:
                 self.cur_observation_data['rgb_image'] = rospy.wait_for_message("/head_xtion/rgb/image_rect_color", Image, timeout=10.0)
                 self.cur_observation_data['depth_image'] = rospy.wait_for_message("/head_xtion/depth/image_rect", Image, timeout=10.0)
                 self.cur_observation_data['camera_info'] = rospy.wait_for_message(self.camera_info_topic, CameraInfo, timeout=10.0)
-                self.cur_observation_data['scene_cloud'] = scene.unfiltered_cloud
+                self.cur_observation_data['scene_cloud'] = scene
                 self.cur_observation_data['waypoint'] = self.cur_waypoint
                 self.cur_observation_data['timestamp'] = int(rospy.Time.now().to_sec())
                 self.cur_observation_data['robot_pose'] = rospy.wait_for_message("/robot_pose", geometry_msgs.msg.Pose, timeout=10.0)
-                self.cur_observation_data['tf'] = rospy.wait_for_message("/tf", TFMessage, timeout=10.0)
+
+                # populates the tf entry with a few seconds worth of tf data
+                listener = TransformationStore()
+                listener.create_live()
+                print("waiting for listener")
+                rospy.sleep(2)
+                listener.kill()
+                self.cur_observation_data['tf'] = listener.get_as_msg()
+
             except rospy.ROSException, e:
                 rospy.logwarn("Failed to get some observation data")
                 rospy.logwarn(e)
@@ -323,13 +336,21 @@ class LearningCore:
         return self.cur_observation_data
 
     def assign_segments(self,scene,prev_scene,extra_data=None):
-        rospy.loginfo("assigning")
+        rospy.loginfo("Assigning segments")
         cur_scene = scene
         self.cur_view_soma_ids = []
+        have_previous_scene = False
 
         # if this is not scene 0, ie. we have a previous scene to compare to
-        if not prev_scene:
-            rospy.loginfo("don't have previous scene to compare to, assuming first run")
+        if(prev_scene is not None):
+            if(prev_scene is not scene):
+                have_previous_scene = True
+
+        if(have_previous_scene):
+            rospy.loginfo("we have a previous scene")
+        else:
+            rospy.loginfo("we do not have a previous scene")
+
 
         if not cur_scene:
             rospy.loginfo("don't have anything in the current scene...")
@@ -345,7 +366,7 @@ class LearningCore:
             target_db_segment = None
 
             # if there are previous views to look at it
-            if(prev_scene):
+            if(have_previous_scene):
                 rospy.loginfo("seeing if prev scene contains: " + str(cur_scene_segment_instance.segment_id))
                 for pc in prev_scene.segment_list:
                     rospy.loginfo(pc.segment_id)
@@ -377,18 +398,18 @@ class LearningCore:
 
                 new_segment_observation = Observation()
                 #new_segment_observation.id =  I'm ignoring this because if it's left blank, the service generates one for you
-                new_segment_observation.timestamp = self.cur_observation_data['timestamp'],
+                new_segment_observation.timestamp = self.cur_observation_data['timestamp']
                 new_segment_observation.meta_data = "{}"
 
                 new_segment_observation.pose =  cur_scene_segment_instance.map_centroid # centroid in map co-ordinates
                 new_segment_observation.map_cloud =  cur_scene_segment_instance.segmented_pc_mapframe #segmented cloud in map co-ordinates
                 new_segment_observation.camera_cloud = cur_scene_segment_instance.segmented_pc_camframe # segmented  cloud in camera co-ordinates
-                new_segment_observation.room_cloud =   None # segmented cloud aligned to meta-room
+                #new_segment_observation.room_cloud = None # segmented cloud aligned to meta-room
 
-                new_segment_observation.rgb_cropped = cur_scene_segment_instance.cropped_image
-                new_segment_observation.depth_cropped = None
-                new_segment_observation.rgb_masked = cur_scene_segment_instance.rgb_mask
-                new_segment_observation.depth_masked = None
+                new_segment_observation.rgb_cropped = cur_scene_segment_instance.cropped_rgb_image
+                new_segment_observation.depth_cropped =  cur_scene_segment_instance.cropped_depth_image
+                new_segment_observation.rgb_masked = cur_scene_segment_instance.rgb_image_mask
+                new_segment_observation.depth_masked = cur_scene_segment_instance.depth_image_mask
 
                 self.append_obs_to_segment(target_db_segment.id,[new_segment_observation])
 
@@ -407,7 +428,7 @@ class LearningCore:
                     # create it
                     try:
                         cur_soma_obj = SOMA2Object()
-                        cur_soma_obj.id = target_db_segment.segment_id
+                        cur_soma_obj.id = target_db_segment.id
                         cur_soma_obj.type = "unknown"
                         cur_soma_obj.waypoint = self.cur_observation_data['waypoint']
 

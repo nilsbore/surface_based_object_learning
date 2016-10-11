@@ -240,7 +240,8 @@ class SegmentedScene:
         self.to_map_rot = rotation
 
         bridge = CvBridge()
-        cv_rgb_image = bridge.imgmsg_to_cv2(scene_rgb_img, desired_encoding="bgr8")
+        cv_rgb_image = bridge.imgmsg_to_cv2(scene_rgb_img)
+        cv_depth_image = bridge.imgmsg_to_cv2(scene_depth_img)
 
         #print("writing cur scene")
         #f = cv2.imwrite('stuff.png',cv_rgb_image)
@@ -260,6 +261,8 @@ class SegmentedScene:
         for root_segment in indices:
             map_points_data = []
             rgb_image_mask = np.zeros(cv_rgb_image.shape,np.uint8)
+            depth_image_mask = np.zeros(cv_depth_image.shape,np.uint8)
+
             rospy.loginfo("--- segment ----")
 
             cur_segment = SegmentedCluster(root_segment.data)
@@ -321,6 +324,7 @@ class SegmentedScene:
                 # in to make the mask fill the object better
                 for p in self.get_moore_neighbourhood([rgb_y,rgb_x]):
                     rgb_image_mask[int(p[0]),int(p[1])] = [255,255,255]
+                    depth_image_mask[int(p[0]),int(p[1])] = 255
 
                 # figure out a bounding box for this image
                 if(rgb_x < rgb_min_x):
@@ -492,11 +496,19 @@ class SegmentedScene:
 
             do_luminance_filtering = False
 
-            if(do_luminance_filtering):
-                cur_segment.cv_rgb_image_cropped = cv_rgb_image[int(y_start):int(y_end), int(x_start):int(x_end)]
-                cur_segment.cropped_image = bridge.cv2_to_imgmsg(cur_segment.cv_rgb_image_cropped, encoding="bgr8")
-                cur_segment.rgb_image_mask = bridge.cv2_to_imgmsg(rgb_image_mask, encoding="bgr8")
 
+            cur_segment.cv_rgb_image_cropped = cv_rgb_image[int(y_start):int(y_end), int(x_start):int(x_end)]
+            cur_segment.cv_depth_image_cropped = cv_depth_image[int(y_start):int(y_end), int(x_start):int(x_end)]
+
+            cur_segment.cropped_depth_image = bridge.cv2_to_imgmsg(cur_segment.cv_depth_image_cropped)
+
+            cur_segment.cropped_rgb_image = bridge.cv2_to_imgmsg(cur_segment.cv_rgb_image_cropped)
+            cur_segment.rgb_image_mask = bridge.cv2_to_imgmsg(rgb_image_mask)
+            cur_segment.depth_image_mask = bridge.cv2_to_imgmsg(depth_image_mask)
+
+
+
+            if(do_luminance_filtering):
                 hsv = cv2.cvtColor(cur_segment.cv_rgb_image_cropped_unpadded, cv2.COLOR_BGR2YUV)
 
                 avg_luma = 0
@@ -640,11 +652,6 @@ class SegmentProcessor:
                 tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
         else:
             rospy.loginfo("no previous scene to compare to, skipping merging step, all segments regarded as new")
-
-        #except Exception, e:
-        #     rospy.logerr("Failed Segmentation: ")
-        #     rospy.logerr(e)
-        #     return
 
         self.prev_scene = self.cur_scene
         return new_scene

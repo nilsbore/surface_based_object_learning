@@ -13,7 +13,6 @@ import tf
 from recognition_srv_definitions.srv import *
 
 import python_pcd
-from cluster_tracker import SOMAClusterTracker
 import PyKDL
 import tf2_ros
 from cluster_tracking_strategies import ClusterScore
@@ -192,8 +191,6 @@ if __name__ == '__main__':
 #    r = ObjectRecognitionManager()
     print("done, testing")
 
-#    cluster_tracker = SOMAClusterTracker()
-#    cluster_tracker.add_unsegmented_scene(testcl)
 
     rospy.loginfo("-- Waiting for Object Recognition Service --")
     rospy.loginfo("-- 10 SECONDS --")
