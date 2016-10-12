@@ -203,7 +203,7 @@ class LearningCore:
             self.assign_segments(scene,self.segment_processor.prev_scene,extra_data)
             self.pending_obs.append(scene)
 
-            rospy.loginfo("have: " + str(len(self.pending_obs)) + " clouds waiting to be processed")
+            rospy.loginfo("have: " + str(len(self.pending_obs)) + " view(s) waiting to be processed")
 
             return ProcessSceneResponse(True,self.cur_view_soma_ids)
         else:
@@ -343,11 +343,14 @@ class LearningCore:
 
         # if this is not scene 0, ie. we have a previous scene to compare to
         if(prev_scene is not None):
-            if(prev_scene is not scene):
+            if(prev_scene != scene):
                 have_previous_scene = True
 
         if(have_previous_scene):
-            rospy.loginfo("we have a previous scene")
+            rospy.loginfo("We have a previous scene")
+            rospy.loginfo("Current scene ID: " + scene.scene_id)
+            rospy.loginfo("Previous scene ID: " + prev_scene.scene_id)
+
         else:
             rospy.loginfo("we do not have a previous scene")
 
@@ -373,13 +376,16 @@ class LearningCore:
 
                 if(prev_scene.contains_segment_id(cur_scene_segment_instance.segment_id)):
                     rospy.loginfo("getting EXISTING segment")
-                    target_db_segment = self.get_segment(cur_scene_segment_instance.id)
+                    get_segment_req = self.get_segment(cur_scene_segment_instance.segment_id)
+                    if(get_segment_req.result is False):
+                        rospy.logerr("Failed to retreive segment, this is catastrophic")
+                        return
+                    else:
+                        target_db_segment = get_segment_req.response
 
             # if this the first view, or a new segment
             if not target_db_segment:
                 rospy.loginfo("creating NEW segment")
-
-                # inserting a blank segment linked to the current scene we're observing
                 request = self.insert_segment("{}",self.cur_scene_id,[])
                 if(request.result is False):
                     rospy.logerr("Unable to insert segment, this is catastrophic")
@@ -413,6 +419,11 @@ class LearningCore:
 
                 self.append_obs_to_segment(target_db_segment.id,[new_segment_observation])
 
+                # do some sanity checking
+                get_segment_req= self.get_segment(cur_scene_segment_instance.segment_id)
+                seg = get_segment_req.response
+                rospy.loginfo("segment: " + seg.id + " now has " + str(len(seg.observations)) + " observations")
+
                 cur_soma_obj = None
                 soma_objs = self.get_soma_objects_with_id(target_db_segment.id)
 
@@ -424,7 +435,7 @@ class LearningCore:
                 else:
                     rospy.loginfo("soma doesn't have this object")
                     # if this object is unknown, lets register a new unknown object in SOMA2
-                    # we do not have a soma object with this id
+                    #  have a soma object with this id
                     # create it
                     try:
                         cur_soma_obj = SOMA2Object()

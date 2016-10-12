@@ -161,12 +161,12 @@ class ViewAlignmentManager:
             tls = [ts.translation.x,ts.rotation.y,ts.rotation.z]
             # make new clouds out of the segmented clouds in this scene
             transformed_clusters[orig.scene_id] = []
-            for cluster in orig.cluster_list:
+            for cluster in orig.segment_list:
                 # transform data using above transforms, first to cam frame
                 cc = self.transform_cloud(cluster.segmented_pc_camframe,orig.to_map_trans,orig.to_map_rot)
                 # then to aligned map
                 cm = self.transform_cloud(cc,tls,rot)
-                transformed_clusters[orig.scene_id].append([cluster.cluster_id,cm])
+                transformed_clusters[orig.scene_id].append([cluster.segment_id,cm])
 
         return transformed_clusters
 

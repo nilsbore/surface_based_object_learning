@@ -66,7 +66,7 @@ class SegmentedCluster:
         self.assigned = False
         self.label = None
         self.confidence = 0.0
-
+        self.segment_id = "INSTANCE-ID-"+str(uuid.uuid4())
 
 
     def reset_assignment(self):
@@ -642,6 +642,9 @@ class SegmentProcessor:
         rospy.loginfo("new scene added, with " + str(new_scene.num_segments) + " segments")
         rospy.loginfo("Applying tracking and filtering to see how many of these are interesting")
 
+        if(self.cur_scene):
+            self.prev_scene = self.cur_scene
+
         self.cur_scene = new_scene
 
         if(self.prev_scene and self.cur_scene and self.root_scene):
@@ -653,7 +656,7 @@ class SegmentProcessor:
         else:
             rospy.loginfo("no previous scene to compare to, skipping merging step, all segments regarded as new")
 
-        self.prev_scene = self.cur_scene
+
         return new_scene
 
 
