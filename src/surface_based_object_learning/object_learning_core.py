@@ -415,7 +415,6 @@ class LearningCore:
                 new_segment_observation.rgb_cropped = cur_scene_segment_instance.cropped_rgb_image
                 new_segment_observation.depth_cropped =  cur_scene_segment_instance.cropped_depth_image
                 new_segment_observation.rgb_masked = cur_scene_segment_instance.rgb_image_mask
-                new_segment_observation.depth_masked = cur_scene_segment_instance.depth_image_mask
 
                 self.append_obs_to_segment(target_db_segment.id,[new_segment_observation])
 

@@ -261,7 +261,6 @@ class SegmentedScene:
         for root_segment in indices:
             map_points_data = []
             rgb_image_mask = np.zeros(cv_rgb_image.shape,np.uint8)
-            depth_image_mask = np.zeros(cv_depth_image.shape,np.uint8)
 
             rospy.loginfo("--- segment ----")
 
@@ -300,7 +299,7 @@ class SegmentedScene:
             total_points = 0
             sc_roi_check = False
             unique_rgb = set()
-
+            rgb_points = []
             for points in cur_segment.data:
                 # store the roxe world transformed point too
                 pt_s = PointStamped()
@@ -316,15 +315,19 @@ class SegmentedScene:
                 # get the 2d pos of the 3d point
                 rgb_point = model.project3dToPixel((pt_s.point.x, pt_s.point.y, pt_s.point.z))
 
-                rgb_x = rgb_point[0]
-                rgb_y = rgb_point[1]
+                rgb_x = int(rgb_point[0])
+                rgb_y = int(rgb_point[1])
+                rgb_points.append(rgb_point)
+                rgb_image_mask[rgb_y,rgb_x] = [255,255,255]
 
                 unique_rgb.add((rgb_x,rgb_y))
                 # next we extend a little bit around the point and add some neighbouring points
                 # in to make the mask fill the object better
-                for p in self.get_moore_neighbourhood([rgb_y,rgb_x]):
-                    rgb_image_mask[int(p[0]),int(p[1])] = [255,255,255]
-                    depth_image_mask[int(p[0]),int(p[1])] = 255
+
+
+                #for p in self.get_moore_neighbourhood([rgb_y,rgb_x]):
+                #    rgb_image_mask[int(p[0]),int(p[1])] = [255,255,255]
+
 
                 # figure out a bounding box for this image
                 if(rgb_x < rgb_min_x):
@@ -503,8 +506,17 @@ class SegmentedScene:
             cur_segment.cropped_depth_image = bridge.cv2_to_imgmsg(cur_segment.cv_depth_image_cropped)
 
             cur_segment.cropped_rgb_image = bridge.cv2_to_imgmsg(cur_segment.cv_rgb_image_cropped)
+
+
+            rgb_image_mask = cv2.cvtColor(rgb_image_mask,cv2.COLOR_BGR2GRAY)
+            ret,thresh = cv2.threshold(rgb_image_mask,127,255,cv2.THRESH_BINARY)
+            contours,hierarchy=cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+            rgb_image_mask = np.zeros(cv_rgb_image.shape,np.uint8)
+            cv2.drawContours(rgb_image_mask, contours, -1, (255,255,255), 3)
+
             cur_segment.rgb_image_mask = bridge.cv2_to_imgmsg(rgb_image_mask)
-            cur_segment.depth_image_mask = bridge.cv2_to_imgmsg(depth_image_mask)
+
+            cv2.imwrite(str(uuid.uuid4())+'_mask.png',rgb_image_mask)
 
 
 
