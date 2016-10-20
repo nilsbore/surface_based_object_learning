@@ -2,8 +2,8 @@
 import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField
-# SOMA2 stuff
-from soma2_msgs.msg import SOMA2Object
+# soma stuff
+from soma_msgs.msg import SOMAObject
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion, Point
 import sensor_msgs.point_cloud2 as pc2
@@ -27,10 +27,10 @@ class ROIFilter:
         #rospy.init_node('test_roi_filter_', anonymous = True)
         rospy.loginfo("---created ROI filter ---")
         rospy.loginfo("getting soma service")
-        rospy.wait_for_service('soma2/query_db')
+        rospy.wait_for_service('soma/query_db')
         rospy.loginfo("done")
         rospy.loginfo("setting up proxy")
-        self.soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
+        self.soma_query = rospy.ServiceProxy('soma/query_db',SOMAQueryObjs)
         rospy.loginfo("done")
         self.gather_rois()
         rospy.loginfo("launching SOMa ROI check server")
@@ -42,7 +42,7 @@ class ROIFilter:
         return PointInROIResponse(p)
 
     def gather_rois(self):
-        query = SOMA2QueryObjsRequest()
+        query = SOMAQueryObjsRequest()
         query.query_type = 2
         response = self.soma_query(query)
 

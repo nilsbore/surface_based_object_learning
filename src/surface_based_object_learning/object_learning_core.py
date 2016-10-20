@@ -29,8 +29,8 @@ import tf, tf2_msgs.msg
 from surface_based_object_learning.srv import *
 from util import TransformationStore
 
-# SOMA2 stuff
-from soma2_msgs.msg import SOMA2Object
+# soma stuff
+from soma_msgs.msg import SOMAObject
 from soma_manager.srv import *
 from soma_llsd.srv import *
 
@@ -64,19 +64,19 @@ class LearningCore:
 
         rospy.loginfo("setting up SOMA services")
         rospy.loginfo("getting SOMA insert service")
-        rospy.wait_for_service('soma2/insert_objects')
+        rospy.wait_for_service('soma/insert_objects')
         rospy.loginfo("done")
-        self.soma_insert = rospy.ServiceProxy('soma2/insert_objects',SOMA2InsertObjs)
+        self.soma_insert = rospy.ServiceProxy('soma/insert_objects',somaInsertObjs)
 
         rospy.loginfo("getting SOMA query service")
-        rospy.wait_for_service('soma2/query_db')
+        rospy.wait_for_service('soma/query_db')
         rospy.loginfo("done")
-        self.soma_get = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
+        self.soma_get = rospy.ServiceProxy('soma/query_db',somaQueryObjs)
 
         rospy.loginfo("getting SOMA update service")
-        rospy.wait_for_service('/soma2/update_object')
+        rospy.wait_for_service('/soma/update_object')
         rospy.loginfo("done")
-        self.soma_update = rospy.ServiceProxy('soma2/update_object',SOMA2UpdateObject)
+        self.soma_update = rospy.ServiceProxy('soma/update_object',somaUpdateObject)
         self.recog_manager = None
         rospy.loginfo("setting up view alignment manager")
         self.view_alignment_manager = ViewAlignmentManager()
@@ -273,14 +273,14 @@ class LearningCore:
 
     def add_soma_object(self,obj):
         rospy.loginfo("getting service")
-        rospy.wait_for_service('soma2/insert_objects')
+        rospy.wait_for_service('soma/insert_objects')
         rospy.loginfo("done")
-        soma_insert = rospy.ServiceProxy('soma2/insert_objects',SOMA2InsertObjs)
+        soma_insert = rospy.ServiceProxy('soma/insert_objects',somaInsertObjs)
         soma_insert(obj)
 
     def get_soma_objects_with_id(self,id):
         rospy.loginfo("looking for SOMA objects with id: " + str(id))
-        query = SOMA2QueryObjsRequest()
+        query = somaQueryObjsRequest()
 
         query.query_type = 0
         query.usetimestep = False
@@ -433,11 +433,11 @@ class LearningCore:
 
                 else:
                     rospy.loginfo("soma doesn't have this object")
-                    # if this object is unknown, lets register a new unknown object in SOMA2
+                    # if this object is unknown, lets register a new unknown object in soma
                     #  have a soma object with this id
                     # create it
                     try:
-                        cur_soma_obj = SOMA2Object()
+                        cur_soma_obj = SOMAObject()
                         cur_soma_obj.id = target_db_segment.id
                         cur_soma_obj.type = "unknown"
                         cur_soma_obj.waypoint = self.cur_observation_data['waypoint']

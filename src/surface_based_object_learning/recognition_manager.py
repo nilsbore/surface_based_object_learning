@@ -3,8 +3,8 @@ import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField
 from world_modeling.srv import *
-# SOMA2 stuff
-from soma2_msgs.msg import SOMA2Object
+# soma stuff
+from soma_msgs.msg import SOMAObject
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion
 import sensor_msgs.point_cloud2 as pc2
