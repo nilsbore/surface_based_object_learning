@@ -66,17 +66,17 @@ class LearningCore:
         rospy.loginfo("getting SOMA insert service")
         rospy.wait_for_service('soma/insert_objects')
         rospy.loginfo("done")
-        self.soma_insert = rospy.ServiceProxy('soma/insert_objects',somaInsertObjs)
+        self.soma_insert = rospy.ServiceProxy('soma/insert_objects',SOMAInsertObjs)
 
         rospy.loginfo("getting SOMA query service")
-        rospy.wait_for_service('soma/query_db')
+        rospy.wait_for_service('soma/query_objects')
         rospy.loginfo("done")
-        self.soma_get = rospy.ServiceProxy('soma/query_db',somaQueryObjs)
+        self.soma_get = rospy.ServiceProxy('soma/query_objects',SOMAQueryObjs)
 
         rospy.loginfo("getting SOMA update service")
         rospy.wait_for_service('/soma/update_object')
         rospy.loginfo("done")
-        self.soma_update = rospy.ServiceProxy('soma/update_object',somaUpdateObject)
+        self.soma_update = rospy.ServiceProxy('soma/update_object',SOMAUpdateObject)
         self.recog_manager = None
         rospy.loginfo("setting up view alignment manager")
         self.view_alignment_manager = ViewAlignmentManager()
@@ -275,20 +275,20 @@ class LearningCore:
         rospy.loginfo("getting service")
         rospy.wait_for_service('soma/insert_objects')
         rospy.loginfo("done")
-        soma_insert = rospy.ServiceProxy('soma/insert_objects',somaInsertObjs)
+        soma_insert = rospy.ServiceProxy('soma/insert_objects',SOMAInsertObjs)
         soma_insert(obj)
 
     def get_soma_objects_with_id(self,id):
         rospy.loginfo("looking for SOMA objects with id: " + str(id))
-        query = somaQueryObjsRequest()
+        query = SOMAQueryObjsRequest()
 
         query.query_type = 0
-        query.usetimestep = False
-        query.uselowertime =  False
-        query.useuppertime =  False
-        query.usedates =  False
-        query.useweekday =  False
-        query.useroi =  False
+        #query.usetimestep = False
+        #query.uselowertime =  False
+        #query.useuppertime =  False
+        #query.usedates =  False
+        #query.useweekday =  False
+        #query.useroi =  False
 
         query.objectids = ([id])
         query.objecttypes=['']
@@ -440,7 +440,7 @@ class LearningCore:
                         cur_soma_obj = SOMAObject()
                         cur_soma_obj.id = target_db_segment.id
                         cur_soma_obj.type = "unknown"
-                        cur_soma_obj.waypoint = self.cur_observation_data['waypoint']
+                        #cur_soma_obj.waypoint = self.cur_observation_data['waypoint']
 
                         # either way we want to record this, so just do it here?
                         cur_soma_obj.cloud = new_segment_observation.map_cloud
@@ -449,7 +449,7 @@ class LearningCore:
                         if(extra_data is not None):
                             cur_soma_obj.logtimestamp = self.cur_observation_data['timestamp'] # jesus christ
 
-                        cur_soma_obj.sweepCenter = self.cur_observation_data['robot_pose']
+                        #cur_soma_obj.sweepCenter = self.cur_observation_data['robot_pose']
 
                         rospy.loginfo("inserting into SOMA")
                         res = self.soma_insert([cur_soma_obj])

@@ -26,8 +26,8 @@ def look_at_table():
     ptuClient.wait_for_server()
 
     goal = flir_pantilt_d46.msg.PtuGotoGoal()
-    goal.tilt = 15 # 30 seems best
-    goal.tilt_vel = 0.1
+    goal.tilt = 5 # 30 seems best
+    goal.tilt_vel = 0.5
     ptuClient.send_goal(goal)
     ptuClient.wait_for_result()
 

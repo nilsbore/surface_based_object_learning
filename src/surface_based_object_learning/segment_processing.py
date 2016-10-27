@@ -25,7 +25,7 @@ import base64
 from roi_filter import ROIFilter
 from view_registration import ViewAlignmentManager
 import python_pcd
-import pcl
+#import pcl
 from bham_seg import Segmentation
 from util import TransformationStore
 

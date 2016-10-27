@@ -60,6 +60,7 @@ find_package(catkin REQUIRED COMPONENTS
    FILES
     ProcessScene.srv
     PointInROI.srv
+    PointSetInROI.srv
 #   Service2.srv
  )
 

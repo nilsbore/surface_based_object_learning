@@ -1,0 +1,4 @@
+geometry_msgs/Point[] input     # a set of input points
+geometry_msgs/Point pose        # NOT optional check the ROI that is found to be closest to this pose. could be the robot pose, or pose of a waypoint etc. 
+---
+bool[] result                   # whether each point given is in the ROI or not
