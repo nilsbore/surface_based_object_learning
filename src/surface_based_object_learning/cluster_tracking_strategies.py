@@ -7,7 +7,7 @@ from view_registration import ViewAlignmentManager
 import Queue as q
 import sensor_msgs.point_cloud2 as pc2
 from sensor_msgs.msg import PointCloud2, PointField
-
+from initial_surface_view_evaluation.srv import *
 import pcl
 
 class BBox():
@@ -43,112 +43,47 @@ class ClusterTrackingStrategy:
     def track(self,cur_scene,prev_scene,root_scene):
         rospy.loginfo("-- Performing Tracking")
 
-class VoxelViewAlignedVotingBasedClusterTrackingStrategy(ClusterTrackingStrategy):
+class OctomapSimilarityTrackerStrategy(ClusterTrackingStrategy):
+
+    def __init__(self):
+        self.octo_similarity_service = rospy.ServiceProxy('/surface_based_object_learning/calculate_octree_overlap',CalculateOctreeOverlap)
 
 
-    def track(self,cur_scene,prev_scene,root_scene,view_alignment_manager):
-        rospy.loginfo("VoxelViewAlignedVotingBasedClusterTrackingStrategy")
+    def track(self,cur_scene,prev_scene,root_scene):
+        rospy.loginfo("OctomapSimilarityTracker")
         rospy.loginfo(""+str(len(cur_scene.segment_list)) + " clusters in this scene")
         rospy.loginfo(""+str(len(prev_scene.segment_list)) + " clusters in previous scene")
         if(cur_scene is None or prev_scene is None or root_scene is None):
             rospy.logerr("An input scene is null, not tracking")
             return
-
+        if(self.octo_similarity_service is None):
+            rospy.logerr("do not have octomap similarity service")
         # set all clusters to be unassigned
         cur_scene.reset_segment_assignments()
         prev_scene.reset_segment_assignments()
 
-        # align cur_scene and prev_scene clouds with root_scene
-        # gives us: transform. apply this to the cluster clouds
-        # recalculate bbox and points from this
-        aligned_clusters = view_alignment_manager.register_scenes(cur_scene,prev_scene,root_scene)
-        rospy.loginfo("TRACKER: done aligning")
-
-
-        c_max = len(cur_scene.segment_list)
-        num_assigned = 0
-        use_core = False
-        octree_res = 0.3
-        scores = {}
-
-        for cur_cluster in cur_scene.segment_list:
-
-            cur_aligned = None
-
-            for x in aligned_clusters[cur_scene.scene_id]:
-                if x[0] == cur_cluster.segment_id:
-                    cur_aligned = x[1]
-                    break
-
-            cur_cld = pcl.PointCloud()
-            pts = []
-            for point in pc2.read_points(cur_aligned):
-                pts.append([point[0],point[1],point[2]])
-
-            if not pts:
+        print("calculating scores")
+        for cur_seg in cur_scene.segment_list:
+            if(cur_seg.assigned is True):
                 continue
-
-            pts = np.array(pts,dtype=np.float32)
-            cur_cld.from_array(pts)
-            cur_octree = cur_cld.make_octree(octree_res)
-
-
-            cur_octree.add_points_from_input_cloud()
-
-            cur_occupied = cur_octree.get_occupied_voxel_centers()
-
-            for prev_cluster in prev_scene.segment_list:
-                prev_aligned = None
-                for x in aligned_clusters[prev_scene.scene_id]:
-                    if x[0] == prev_cluster.segment_id:
-                        prev_aligned = x[1]
-                        break
-
-
-                scores[(cur_cluster,prev_cluster)] = ClusterScore(cur_cluster,prev_cluster,0)
-                pre_cld = pcl.PointCloud()
-                pts = []
-                for point in pc2.read_points(prev_aligned):
-                    pts.append([point[0],point[1],point[2]])
-                pts = np.array(pts,dtype=np.float32)
-
-                for vc in pts:
-                    if cur_octree.is_voxel_occupied_at_point(np.array(vc,dtype=np.float32)):
-                        scores[(cur_cluster,prev_cluster)].score = scores[(cur_cluster,prev_cluster)].score+1
-
-                if(pts.size > 0):
-                    scores[(cur_cluster,prev_cluster)].score = (float)(scores[(cur_cluster,prev_cluster)].score)/(len(pts))
-                else:
-                    scores[(cur_cluster,prev_cluster)].score = 0
-
-
-        # assign cluster
-        assigned = []
-        for i in scores:
-            cur = scores[i].one
+            # calculate the score of this segment against everything in the last scene
             best_score = 0
-            best_cluster = None
-            if(cur.segment_id not in assigned):
-                for j in scores:
-                    if(scores[j].one.segment_id in cur.segment_id):
-                        can = scores[j].two
-                        if(can.segment_id not in assigned):
-                            rospy.loginfo(str(cur_scene.segment_list.index(cur)) +" \t \t " + str(prev_scene.segment_list.index(can)) +" \t \t " + str(scores[j].score))
-                            if(scores[j].score > best_score):
-                                best_score = scores[j].score
-                                best_cluster = can
-
-                if(best_cluster != None):
-                    rospy.loginfo("best score for: " + str(cur_scene.segment_list.index(cur))  + " is: " + str(best_score) +" at best cluster: " + str(prev_scene.segment_list.index(best_cluster)))
-                    assigned.append(cur.segment_id)
-                    assigned.append(best_cluster.segment_id)
-                    rospy.loginfo("assigned cluster with index " + str(cur_scene.segment_list.index(cur))  + " in cur frame, to prev cluster with index " + str(prev_scene.segment_list.index(best_cluster)))
-                    cur.segment_id = best_cluster.segment_id
-                    rospy.loginfo("that cluster UUID is: " + str(best_cluster.segment_id))
-                else:
-                    rospy.loginfo("Couldn't find a good cluster for cluster: " + scores[i].one.segment_id + "(May be a brand new segment, or incomparable to previously seen segments)")
-            else:
-                rospy.loginfo("Skipping assignment of " + cur.segment_id + " as it's already been assigned")
+            best_segment = None
+            for prev_seg in prev_scene.segment_list:
+                if(prev_seg.assigned is True):
+                    continue
+                score = self.octo_similarity_service(cur_seg.segmented_pc_mapframe,prev_seg.segmented_pc_mapframe)
+                # could threshold this further?
+                rospy.loginfo("source: " + cur_seg.segment_id + " target: " + prev_seg.segment_id + " score:" + str(score))
+                if(score < 25):
+                    continue
+                if(score > best_score):
+                    best_score = score
+                    best_segment = prev_seg
+            cur_seg.assigned = True
+            best_segment.assigned = True
+            rospy.loginfo("\nbest cluster for " + cur_seg.segment_id + " found at cluster with id " + best_segment.segment_id + " and score " + str(best_score))
+            cur_seg.segment_id = best_segment.segment_id
 
 
 

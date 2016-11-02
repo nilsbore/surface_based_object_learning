@@ -663,8 +663,8 @@ class SegmentProcessor:
             rospy.loginfo("--- Checking segments ---")
             if(len(self.cur_scene.segment_list) > 0 and len(self.prev_scene.segment_list) > 0):
                 rospy.loginfo("we have a previous observation to compare to")
-                tracker = VoxelViewAlignedVotingBasedClusterTrackingStrategy()
-                tracker.track(self.cur_scene,self.prev_scene,self.root_scene,self.view_alignment_manager)
+                tracker = OctomapSimilarityTrackerStrategy()
+                tracker.track(self.cur_scene,self.prev_scene,self.root_scene)
         else:
             rospy.loginfo("no previous scene to compare to, skipping merging step, all segments regarded as new")
 
