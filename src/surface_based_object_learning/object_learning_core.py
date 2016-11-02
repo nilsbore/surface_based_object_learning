@@ -45,9 +45,9 @@ class LearningCore:
     def __init__(self,db_hostname,db_port):
         rospy.init_node('surface_based_object_learning', anonymous = False)
         self.setup_clean = False
-        rospy.loginfo("Manager Online")
+        rospy.loginfo("LEARNING CORE: Manager Online")
         # make a segment tracker
-        rospy.loginfo("looking for camera info topic")
+        rospy.loginfo("LEARNING CORE: looking for camera info topic")
 
         self.segment_processor = SegmentProcessor()
         self.pending_obs = []
@@ -55,33 +55,33 @@ class LearningCore:
         self.cur_view_soma_ids = []
         self.cur_observation_data = None
 
-        rospy.loginfo("setting up services")
+        rospy.loginfo("LEARNING CORE: setting up services")
         process = rospy.Service('/surface_based_object_learning/process_scene',ProcessScene,self.process_scene_callback)
-        rospy.loginfo("scene processing service running")
+        rospy.loginfo("LEARNING CORE: scene processing service running")
 
         begin_observations = rospy.Service('/surface_based_object_learning/begin_observation_sequence',Trigger,self.begin_obs)
         end_observations = rospy.Service('/surface_based_object_learning/end_observation_sequence',Trigger,self.end_obs)
 
-        rospy.loginfo("setting up SOMA services")
-        rospy.loginfo("getting SOMA insert service")
+        rospy.loginfo("LEARNING CORE: setting up SOMA services")
+        rospy.loginfo("LEARNING CORE: getting SOMA insert service")
         rospy.wait_for_service('soma/insert_objects')
-        rospy.loginfo("done")
+        rospy.loginfo("LEARNING CORE: done")
         self.soma_insert = rospy.ServiceProxy('soma/insert_objects',SOMAInsertObjs)
 
-        rospy.loginfo("getting SOMA query service")
+        rospy.loginfo("LEARNING CORE: getting SOMA query service")
         rospy.wait_for_service('soma/query_objects')
-        rospy.loginfo("done")
+        rospy.loginfo("LEARNING CORE: done")
         self.soma_get = rospy.ServiceProxy('soma/query_objects',SOMAQueryObjs)
 
-        rospy.loginfo("getting SOMA update service")
+        rospy.loginfo("LEARNING CORE: getting SOMA update service")
         rospy.wait_for_service('/soma/update_object')
-        rospy.loginfo("done")
+        rospy.loginfo("LEARNING CORE: done")
         self.soma_update = rospy.ServiceProxy('soma/update_object',SOMAUpdateObject)
         self.recog_manager = None
-        rospy.loginfo("setting up view alignment manager")
+        rospy.loginfo("LEARNING CORE: setting up view alignment manager")
         self.view_alignment_manager = ViewAlignmentManager()
 
-        rospy.loginfo("getting LLSD services")
+        rospy.loginfo("LEARNING CORE: getting LLSD services")
         rospy.wait_for_service('/soma_llsd/insert_scene')
         self.view_store_insert = rospy.ServiceProxy('/soma_llsd/insert_scene',InsertScene)
 
@@ -96,35 +96,35 @@ class LearningCore:
 
         self.clean_up_obs()
 
-        rospy.loginfo("-- node setup completed --")
+        rospy.loginfo("LEARNING CORE: -- node setup completed --")
         self.setup_clean = True
 
         rospy.spin()
 
     def clean_up_obs(self):
-        rospy.loginfo("running cleanup")
+        rospy.loginfo("LEARNING CORE: running cleanup")
         self.pending_obs = []
         self.cur_sequence_obj_ids = []
         self.cur_view_soma_ids = []
         self.cur_observation_data = None
         self.segment_processor.reset()
         self.cur_episode_id = str(uuid.uuid4())
-        rospy.loginfo("-- new episode id: " + self.cur_episode_id)
+        rospy.loginfo("LEARNING CORE: -- new episode id: " + self.cur_episode_id)
 
 
     def begin_obs(self,req):
-        rospy.loginfo("-- received signal to begin sequence of observations --")
+        rospy.loginfo("LEARNING CORE: -- received signal to begin sequence of observations --")
         if(self.setup_clean):
-            rospy.loginfo("ready to go")
+            rospy.loginfo("LEARNING CORE: ready to go")
         else:
-            rospy.loginfo("ERROR: node setup not completed yet, wait a sec and try again")
+            rospy.loginfo("LEARNING CORE: ERROR: node setup not completed yet, wait a sec and try again")
             return
         self.clean_up_obs()
         return TriggerResponse(True,"Observations Beginning: Assuming all subsequent observations are from the same sequence.")
 
     def end_obs(self,req):
-        rospy.loginfo("-- received signal to terminate sequence of observations --")
-        rospy.loginfo("")
+        rospy.loginfo("LEARNING CORE: -- received signal to terminate sequence of observations --")
+        rospy.loginfo("LEARNING CORE: ")
         self.do_postprocessing()
         return TriggerResponse(True,"Observations Ending: Assuming all previous observations were from the same sequence.")
 
@@ -134,14 +134,14 @@ class LearningCore:
             camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/sw_registered/camera_info",  CameraInfo, timeout=2)
             return "/head_xtion/depth_registered/sw_registered/camera_info"
         except Exception,e:
-            rospy.loginfo("couldn't find /head_xtion/depth_registered/sw_registered/camera_info")
+            rospy.loginfo("LEARNING CORE: couldn't find /head_xtion/depth_registered/sw_registered/camera_info")
 
         if(not camera_msg):
             try:
                 camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=2)
                 return "/head_xtion/depth_registered/camera_info"
             except Exception,e:
-                rospy.loginfo("couldn't find /head_xtion/depth_registered/camera_info")
+                rospy.loginfo("LEARNING CORE: couldn't find /head_xtion/depth_registered/camera_info")
 
         return None
 
@@ -169,31 +169,31 @@ class LearningCore:
             self.cur_observation_data['robot_pose'])
 
             if(scene.result is True):
-                rospy.loginfo("successfully added scene to view store")
+                rospy.loginfo("LEARNING CORE: successfully added scene to view store")
                 self.cur_scene_id = scene.response.id
             else:
                 rospy.logerr("couldn't add scene to view store, this is catastrophic")
 
         except Exception,e:
-            rospy.loginfo("failed to add view to view store")
+            rospy.loginfo("LEARNING CORE: failed to add view to view store")
 
 
     def process_scene(self,cloud,waypoint,extra_data=None):
         #try:
-        rospy.loginfo("---- Storing view in View Store ----")
+        rospy.loginfo("LEARNING CORE: ---- Storing view in View Store ----")
         self.cur_waypoint = waypoint
         self.populate_observation_data(cloud,extra_data)
         self.register_with_view_store(cloud)
 
 
-        rospy.loginfo("---- Segmenting Scene ----")
+        rospy.loginfo("LEARNING CORE: ---- Segmenting Scene ----")
         scene = self.segment_processor.add_unsegmented_scene(self.cur_observation_data,extra_data)
         if(scene.clean_setup is True):
 
             scene.waypoint = waypoint
 
             if(self.recog_manager):
-                rospy.loginfo("---- Running Object Recognition ----")
+                rospy.loginfo("LEARNING CORE: ---- Running Object Recognition ----")
                 recognition = self.recog_manager.recognise_scene(cloud)
                 if(recognition is True):
                     self.recog_manager.assign_labels(scene)
@@ -203,11 +203,11 @@ class LearningCore:
             self.assign_segments(scene,self.segment_processor.prev_scene,extra_data)
             self.pending_obs.append(scene)
 
-            rospy.loginfo("have: " + str(len(self.pending_obs)) + " view(s) waiting to be processed")
+            rospy.loginfo("LEARNING CORE: have: " + str(len(self.pending_obs)) + " view(s) waiting to be processed")
 
             return ProcessSceneResponse(True,self.cur_view_soma_ids)
         else:
-            rospy.loginfo("Error in processing scene")
+            rospy.loginfo("LEARNING CORE: Error in processing scene")
 
         #except Exception,e:
         #    rospy.logerr("Unable to segment and process this scene")
@@ -231,24 +231,24 @@ class LearningCore:
             return result
 
     def do_postprocessing(self):
-        rospy.loginfo("-- beginning post-processing, attempting view alignment and object label updates -- ")
+        rospy.loginfo("LEARNING CORE: -- beginning post-processing, attempting view alignment and object label updates -- ")
 
         if(len(self.cur_sequence_obj_ids) == 0):
-            rospy.loginfo("-- no segments found in this scene, or if they were they were filtered out by the SOMA region or height filters ")
+            rospy.loginfo("LEARNING CORE: -- no segments found in this scene, or if they were they were filtered out by the SOMA region or height filters ")
 
         for object_id in self.cur_sequence_obj_ids:
             soma_object = self.get_soma_objects_with_id(object_id)
             segment = self.get_segment(object_id)
 
             observations = segment.observations
-            rospy.loginfo("observations for " + str(object_id) + " = " + str(len(observations)))
+            rospy.loginfo("LEARNING CORE: observations for " + str(object_id) + " = " + str(len(observations)))
             if(len(observations) >= 2):
-                rospy.loginfo("processing...")
+                rospy.loginfo("LEARNING CORE: processing...")
                 # update world model
                 try:
-                    rospy.loginfo("updating world model")
+                    rospy.loginfo("LEARNING CORE: updating world model")
                     merged_cloud = self.view_alignment_manager.register_views(segment)
-                    rospy.loginfo("updating SOMA obj")
+                    rospy.loginfo("LEARNING CORE: updating SOMA obj")
                     soma_objects.objects[0].cloud = merged_cloud
 
                     self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
@@ -257,29 +257,29 @@ class LearningCore:
                     rospy.logerr(e)
                     continue
             else:
-                rospy.loginfo("not running view alignment, only one view")
+                rospy.loginfo("LEARNING CORE: not running view alignment, only one view")
 
-            #rospy.loginfo("attempting to update object's recognition label")
+            #rospy.loginfo("LEARNING CORE: attempting to update object's recognition label")
             #try:
             #    soma_objects.objects[0].type = str(world_object.label)
             #    self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
-            #    rospy.loginfo("done! this object recognised as a " + str(world_object.label) + " with confidence: " + str(world_object.label_confidence))
+            #    rospy.loginfo("LEARNING CORE: done! this object recognised as a " + str(world_object.label) + " with confidence: " + str(world_object.label_confidence))
             #except Exception,e:
             #    rospy.logerr("Problem updating SOMA object label.")
             #    rospy.logerr(e)
 
-        rospy.loginfo("post-processing complete")
+        rospy.loginfo("LEARNING CORE: post-processing complete")
 
 
     def add_soma_object(self,obj):
-        rospy.loginfo("getting service")
+        rospy.loginfo("LEARNING CORE: getting service")
         rospy.wait_for_service('soma/insert_objects')
-        rospy.loginfo("done")
+        rospy.loginfo("LEARNING CORE: done")
         soma_insert = rospy.ServiceProxy('soma/insert_objects',SOMAInsertObjs)
         soma_insert(obj)
 
     def get_soma_objects_with_id(self,id):
-        rospy.loginfo("looking for SOMA objects with id: " + str(id))
+        rospy.loginfo("LEARNING CORE: looking for SOMA objects with id: " + str(id))
         query = SOMAQueryObjsRequest()
 
         query.query_type = 0
@@ -301,7 +301,7 @@ class LearningCore:
     def populate_observation_data(self,scene,extra_data=None):
         self.cur_observation_data = {}
         if(extra_data is None):
-            rospy.loginfo("*** Making observation using live robot data")
+            rospy.loginfo("LEARNING CORE: *** Making observation using live robot data")
             try:
                 self.camera_info_topic = self.get_camera_info_topic()
                 self.cur_observation_data['rgb_image'] = rospy.wait_for_message("/head_xtion/rgb/image_rect_color", Image, timeout=10.0)
@@ -324,7 +324,7 @@ class LearningCore:
                 rospy.logwarn("Failed to get some observation data")
                 rospy.logwarn(e)
         else:
-                rospy.loginfo("*** Making observation using historic robot data")
+                rospy.loginfo("LEARNING CORE: *** Making observation using historic robot data")
                 self.cur_observation_data['rgb_image'] = extra_data['rgb_image']
                 self.cur_observation_data['camera_info'] = extra_data['camera_info']
                 self.cur_observation_data['scene_cloud'] = extra_data['cloud']
@@ -336,7 +336,7 @@ class LearningCore:
         return self.cur_observation_data
 
     def assign_segments(self,scene,prev_scene,extra_data=None):
-        rospy.loginfo("Assigning segments")
+        rospy.loginfo("LEARNING CORE: Assigning segments")
         cur_scene = scene
         self.cur_view_soma_ids = []
         have_previous_scene = False
@@ -347,17 +347,17 @@ class LearningCore:
                 have_previous_scene = True
 
         if(have_previous_scene):
-            rospy.loginfo("We have a previous scene")
-            rospy.loginfo("Current scene ID: " + scene.scene_id)
-            rospy.loginfo("Previous scene ID: " + prev_scene.scene_id)
+            rospy.loginfo("LEARNING CORE: We have a previous scene")
+            rospy.loginfo("LEARNING CORE: Current scene ID: " + scene.scene_id)
+            rospy.loginfo("LEARNING CORE: Previous scene ID: " + prev_scene.scene_id)
 
         else:
-            rospy.loginfo("we do not have a previous scene")
+            rospy.loginfo("LEARNING CORE: we do not have a previous scene")
 
 
         if not cur_scene:
-            rospy.loginfo("don't have anything in the current scene...")
-            rospy.loginfo("did segmentation fail?")
+            rospy.loginfo("LEARNING CORE: don't have anything in the current scene...")
+            rospy.loginfo("LEARNING CORE: did segmentation fail?")
             return
 
         # we iterate over the INSTANCES OF segmentS visible in the current scene
@@ -370,12 +370,12 @@ class LearningCore:
 
             # if there are previous views to look at it
             if(have_previous_scene):
-                rospy.loginfo("seeing if prev scene contains: " + str(cur_scene_segment_instance.segment_id))
+                rospy.loginfo("LEARNING CORE: seeing if prev scene contains: " + str(cur_scene_segment_instance.segment_id))
                 for pc in prev_scene.segment_list:
                     rospy.loginfo(pc.segment_id)
 
                 if(prev_scene.contains_segment_id(cur_scene_segment_instance.segment_id)):
-                    rospy.loginfo("getting EXISTING segment")
+                    rospy.loginfo("LEARNING CORE: getting EXISTING segment")
                     get_segment_req = self.get_segment(cur_scene_segment_instance.segment_id)
                     if(get_segment_req.result is False):
                         rospy.logerr("Failed to retreive segment, this is catastrophic")
@@ -385,7 +385,7 @@ class LearningCore:
 
             # if this the first view, or a new segment
             if not target_db_segment:
-                rospy.loginfo("creating NEW segment")
+                rospy.loginfo("LEARNING CORE: creating NEW segment")
                 request = self.insert_segment("{}",self.cur_scene_id,[])
                 if(request.result is False):
                     rospy.logerr("Unable to insert segment, this is catastrophic")
@@ -399,7 +399,7 @@ class LearningCore:
             # or retreived the data for it in a previous scene
             if(target_db_segment):
                 # so first add a new observation to it, in all cases
-                rospy.loginfo("making observation")
+                rospy.loginfo("LEARNING CORE: making observation")
                 # add an observation for the object
 
                 new_segment_observation = Observation()
@@ -421,18 +421,18 @@ class LearningCore:
                 # do some sanity checking
                 get_segment_req= self.get_segment(cur_scene_segment_instance.segment_id)
                 seg = get_segment_req.response
-                rospy.loginfo("segment: " + seg.id + " now has " + str(len(seg.observations)) + " observations")
+                rospy.loginfo("LEARNING CORE: segment: " + seg.id + " now has " + str(len(seg.observations)) + " observations")
 
                 cur_soma_obj = None
                 soma_objs = self.get_soma_objects_with_id(target_db_segment.id)
 
                 if(soma_objs.objects):
-                    rospy.loginfo("soma has this object")
+                    rospy.loginfo("LEARNING CORE: soma has this object")
                     cur_soma_obj = soma_objs.objects[0]
                     # nothing to do in this case?
 
                 else:
-                    rospy.loginfo("soma doesn't have this object")
+                    rospy.loginfo("LEARNING CORE: soma doesn't have this object")
                     # if this object is unknown, lets register a new unknown object in soma
                     #  have a soma object with this id
                     # create it
@@ -451,7 +451,7 @@ class LearningCore:
 
                         #cur_soma_obj.sweepCenter = self.cur_observation_data['robot_pose']
 
-                        rospy.loginfo("inserting into SOMA")
+                        rospy.loginfo("LEARNING CORE: inserting into SOMA")
                         res = self.soma_insert([cur_soma_obj])
                     except Exception, e:
                         rospy.logerr("unable to insert into SOMA. Is the database server running?")
@@ -460,10 +460,10 @@ class LearningCore:
                 # record all SOMA objects seen in this view
                 self.cur_view_soma_ids.append(target_db_segment.id)
 
-                rospy.loginfo("done")
+                rospy.loginfo("LEARNING CORE: done")
 
-        rospy.loginfo("DB Update Complete")
-        rospy.loginfo("")
+        rospy.loginfo("LEARNING CORE: DB Update Complete")
+        rospy.loginfo("LEARNING CORE: ")
 
 
 if __name__ == '__main__':
@@ -474,10 +474,10 @@ if __name__ == '__main__':
     args = parser.parse_args(rospy.myargv(argv=sys.argv)[1:])
 
     if(len(sys.argv) < 2):
-        rospy.loginfo("not enough args, need db hostname and port")
+        rospy.loginfo("LEARNING CORE: not enough args, need db hostname and port")
     else:
         hostname = str(vars(args)['db_hostname'][0])
         port = str(vars(args)['db_port'][0])
 
-        rospy.loginfo("got db_hostname as: " + hostname + " got db_port as: " + port)
+        rospy.loginfo("LEARNING CORE: got db_hostname as: " + hostname + " got db_port as: " + port)
         world_state_manager = LearningCore(hostname,port)

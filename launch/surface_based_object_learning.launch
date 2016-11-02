@@ -6,4 +6,6 @@
 
 	<node name="object_learning_core" pkg="surface_based_object_learning" respawn="true" type="object_learning_core.py" args="$(arg db_hostname) $(arg db_port)" output="screen"/>
 
+	<include file="$(find initial_surface_view_evaluation)/launch/surface_evaluation.launch"/>
+
 </launch>
