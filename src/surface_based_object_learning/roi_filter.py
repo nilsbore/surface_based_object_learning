@@ -50,6 +50,7 @@ class ROIFilter:
     def gather_rois(self,filter_point=None):
         rospy.loginfo("Gathering ROIs")
         query = SOMAQueryROIsRequest()
+	query.returnmostrecent = True
         response = self.soma_query(query)
         #rospy.loginfo(response)
 
