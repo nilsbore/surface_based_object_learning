@@ -8,7 +8,7 @@ import Queue as q
 import sensor_msgs.point_cloud2 as pc2
 from sensor_msgs.msg import PointCloud2, PointField
 from initial_surface_view_evaluation.srv import *
-import pcl
+#import pcl
 
 class BBox():
     """ Bounding box of an object with getter functions.
