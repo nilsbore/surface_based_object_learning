@@ -148,39 +148,6 @@ class SegmentedScene:
         res = pc2.create_cloud(cloud.header, cloud.fields, points_out)
         return res
 
-    def get_moore_neighbourhood(self,point):
-        y = point[0]
-        x = point[1]
-        points = []
-        points.append(point)
-
-        if not(y - 1 < 0):
-            points.append([y-1,x])
-
-        if not(y + 1 > 480):
-            points.append([y+1,x])
-
-        if not(x - 1 < 0):
-            points.append([y,x-1])
-
-        if not(x + 1 > 640):
-            points.append([y,x+1])
-
-        if not(y - 1 < 0) and not(x - 1 < 0):
-            points.append([y-1,x-1])
-
-        if not(y + 1 > 480) and not(x - 1 < 0):
-            points.append([y+1,x-1])
-
-        if not(y - 1 < 0) and not(x + 1 > 0):
-            points.append([y-1,x+1])
-
-        if not(y + 1 > 480) and not(x + 1 < 0):
-            points.append([y+1,x+1])
-
-
-        return points
-
     def set_frames(self,cloud):
         rospy.loginfo("RUNNING SET FRAMES")
         self.starting_camera_frame = cloud.header.frame_id
@@ -260,7 +227,7 @@ class SegmentedScene:
         roi_filter.gather_rois()
         for root_segment in indices:
             map_points_data = []
-            rgb_image_mask = np.zeros(cv_rgb_image.shape,np.uint8)
+            image_mask = np.zeros(cv_rgb_image.shape,np.uint8)
 
             rospy.loginfo("--- segment ----")
 
@@ -318,7 +285,7 @@ class SegmentedScene:
                 rgb_x = int(rgb_point[0])
                 rgb_y = int(rgb_point[1])
                 rgb_points.append(rgb_point)
-                rgb_image_mask[rgb_y,rgb_x] = [255,255,255]
+                image_mask[rgb_y,rgb_x] = [255,255,255]
 
                 unique_rgb.add((rgb_x,rgb_y))
                 # next we extend a little bit around the point and add some neighbouring points
@@ -326,7 +293,7 @@ class SegmentedScene:
 
 
                 #for p in self.get_moore_neighbourhood([rgb_y,rgb_x]):
-                #    rgb_image_mask[int(p[0]),int(p[1])] = [255,255,255]
+                #    image_mask[int(p[0]),int(p[1])] = [255,255,255]
 
 
                 # figure out a bounding box for this image
@@ -508,15 +475,15 @@ class SegmentedScene:
             cur_segment.cropped_rgb_image = bridge.cv2_to_imgmsg(cur_segment.cv_rgb_image_cropped)
 
 
-            rgb_image_mask = cv2.cvtColor(rgb_image_mask,cv2.COLOR_BGR2GRAY)
-            ret,thresh = cv2.threshold(rgb_image_mask,127,255,cv2.THRESH_BINARY)
+            image_mask = cv2.cvtColor(image_mask,cv2.COLOR_BGR2GRAY)
+            ret,thresh = cv2.threshold(image_mask,127,255,cv2.THRESH_BINARY)
             contours,hierarchy=cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-            rgb_image_mask = np.zeros(cv_rgb_image.shape,np.uint8)
-            cv2.drawContours(rgb_image_mask, contours, -1, (255,255,255), 3)
+            image_mask = np.zeros(cv_rgb_image.shape,np.uint8)
+            cv2.drawContours(image_mask, contours, -1, (255,255,255), 3)
 
-            cur_segment.rgb_image_mask = bridge.cv2_to_imgmsg(rgb_image_mask)
+            cur_segment.image_mask = bridge.cv2_to_imgmsg(image_mask)
 
-            cv2.imwrite(str(uuid.uuid4())+'_mask.png',rgb_image_mask)
+            cv2.imwrite(str(uuid.uuid4())+'_mask.png',image_mask)
 
 
 
