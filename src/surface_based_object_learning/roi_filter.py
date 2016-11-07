@@ -15,7 +15,6 @@ import PyKDL
 import tf2_ros
 from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
-import python_pcd
 import shapely.geometry
 from shapely.geometry import MultiPoint
 from surface_based_object_learning.srv import *
@@ -50,7 +49,7 @@ class ROIFilter:
     def gather_rois(self,filter_point=None):
         rospy.loginfo("Gathering ROIs")
         query = SOMAQueryROIsRequest()
-	query.returnmostrecent = True
+        query.returnmostrecent = True
         response = self.soma_query(query)
         #rospy.loginfo(response)
 
@@ -146,24 +145,11 @@ class ROIFilter:
     def ros_point_in_roi(self,point_in):
         # allows the system to deal with changes made to ROIs online
         # and avoid having to be reloaded
-        #self.gather_rois()
+        self.gather_rois()
         #rospy.loginfo("Checking: " + str(len(self.soma_polygons)) + " SOMa ROIs")
         point = shapely.geometry.Point(point_in.x,point_in.y)
         for box in self.soma_boxes:
             if(point.within(box)):
-                #rospy.loginfo("IN ROI:" + str(point))
-                return True
-        #rospy.loginfo("OUTSIDE ROI:" + str(point))
-        return False
-
-    def old_ros_point_in_roi(self,point_in):
-        # allows the system to deal with changes made to ROIs online
-        # and avoid having to be reloaded
-        #self.gather_rois()
-        #rospy.loginfo("Checking: " + str(len(self.soma_polygons)) + " SOMa ROIs")
-        point = shapely.geometry.Point(point_in.x,point_in.y)
-        for polygon in self.soma_polygons:
-            if(polygon.contains(point)):
                 #rospy.loginfo("IN ROI:" + str(point))
                 return True
         #rospy.loginfo("OUTSIDE ROI:" + str(point))
@@ -197,12 +183,12 @@ class ROIFilter:
 
     def accel_point_in_roi(self,point_in):
         point = shapely.geometry.Point(point_in[0],point_in[1])
-        poly = None
-        for polygon in self.soma_polygons:
-            if(polygon.contains(point)):
-                poly = polygon
-                return True,poly
-        return False,None
+        for box in self.soma_boxes:
+            if(point.within(box)):
+                #rospy.loginfo("IN ROI:" + str(point))
+                return True
+        #rospy.loginfo("OUTSIDE ROI:" + str(point))
+        return False
 
     def accel_any_point_in_roi(self,cloud_in):
 

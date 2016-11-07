@@ -38,7 +38,7 @@ from soma_llsd.srv import *
 from recognition_srv_definitions.srv import *
 
 import uuid
-import python_pcd
+#import python_pcd
 
 class LearningCore:
 
@@ -139,6 +139,7 @@ class LearningCore:
         if(not camera_msg):
             try:
                 camera_msg = rospy.wait_for_message("/head_xtion/depth_registered/camera_info",  CameraInfo, timeout=2)
+                rospy.loginfo("LEARNING CORE: found /head_xtion/depth_registered/camera_info")
                 return "/head_xtion/depth_registered/camera_info"
             except Exception,e:
                 rospy.loginfo("LEARNING CORE: couldn't find /head_xtion/depth_registered/camera_info")

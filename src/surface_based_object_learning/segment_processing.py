@@ -24,7 +24,7 @@ import cv2
 import base64
 from roi_filter import ROIFilter
 from view_registration import ViewAlignmentManager
-import python_pcd
+#import python_pcd
 #import pcl
 #from bham_seg import Segmentation
 from util import TransformationStore
@@ -341,7 +341,7 @@ class SegmentedScene:
 
                 # here we check to make sure the object has at least one point in a SOMa ROI
                 if(sc_roi_check is False):
-                    pir,poly = roi_filter.accel_point_in_roi([pt_s.point.x,pt_s.point.y])
+                    pir = roi_filter.accel_point_in_roi([pt_s.point.x,pt_s.point.y])
                     if(pir):
                         sc_roi_check = True
                         points_in_roi+=1
@@ -483,7 +483,7 @@ class SegmentedScene:
 
             cur_segment.image_mask = bridge.cv2_to_imgmsg(image_mask)
 
-            cv2.imwrite(str(uuid.uuid4())+'_mask.png',image_mask)
+            #cv2.imwrite(str(uuid.uuid4())+'_mask.png',image_mask)
 
 
 
