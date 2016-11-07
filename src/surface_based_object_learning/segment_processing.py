@@ -368,7 +368,7 @@ class SegmentedScene:
 
             if(points_in_roi == 0):
                 rospy.loginfo("Not enough of object in ROI to continue")
-                #continue
+                continue
             else:
                 rospy.loginfo("Object is in ROI")
 
