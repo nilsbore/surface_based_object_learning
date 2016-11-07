@@ -241,7 +241,7 @@ class LearningCore:
             soma_object = self.get_soma_objects_with_id(object_id)
             segment = self.get_segment(object_id)
 
-            observations = segment.observations
+            observations = segment.response.observations
             rospy.loginfo("LEARNING CORE: observations for " + str(object_id) + " = " + str(len(observations)))
             if(len(observations) >= 2):
                 rospy.loginfo("LEARNING CORE: processing...")
@@ -257,7 +257,7 @@ class LearningCore:
                     rospy.logerr("problem updating object models in world/SOMA db. Unable to register merged clouds")
                     rospy.logerr(e)
                     continue
-            else:
+           else:
                 rospy.loginfo("LEARNING CORE: not running view alignment, only one view")
 
             #rospy.loginfo("LEARNING CORE: attempting to update object's recognition label")
