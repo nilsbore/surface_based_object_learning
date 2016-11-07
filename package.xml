@@ -1,19 +1,19 @@
 <?xml version="1.0"?>
 <package>
-  <name>world_modeling</name>
-  <version>0.0.0</version>
-  <description>The world_modeling package</description>
+  <name>surface_based_object_learning</name>
+  <version>2.0.0</version>
+  <description>The surface_based_object_learning package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
   <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
-  <maintainer email="strands@todo.todo">strands</maintainer>
+  <maintainer email="j.young@cs.bham.ac.uk">Jay Young</maintainer>
 
 
   <!-- One license tag required, multiple allowed, one license per tag -->
   <!-- Commonly used license strings: -->
   <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
-  <license>TODO</license>
+  <license>MIT</license>
 
 
   <!-- Url tags are optional, but mutiple are allowed, one per tag -->
@@ -43,27 +43,33 @@
   <build_depend>rospy</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>soma_roi_manager</build_depend>
-  <build_depend>soma2_msgs</build_depend>
+  <build_depend>soma_msgs</build_depend>
   <build_depend>message_generation</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>sensor_msgs</build_depend>
   <build_depend>soma_io</build_depend>
   <build_depend>observation_registration</build_depend>
   <build_depend>geometry_msgs</build_depend>
-
+  <build_depend>soma_llsd_msgs</build_depend>
+  <build_depend>tf2_ros</build_depend>
+  <build_depend>tf2_msgs</build_depend>
+  <build_depend>soma_llsd_msgs</build_depend>
 
 
   <run_depend>rospy</run_depend>
   <run_depend>std_msgs</run_depend>
   <run_depend>soma_roi_manager</run_depend>
-  <run_depend>soma2_msgs</run_depend>
+  <run_depend>soma_msgs</run_depend>
   <run_depend>message_runtime</run_depend>
   <run_depend>std_msgs</run_depend>
   <run_depend>sensor_msgs</run_depend>
   <run_depend>soma_io</run_depend>
   <run_depend>observation_registration</run_depend>
   <run_depend>geometry_msgs</run_depend>
-
+  <run_depend>soma_llsd_msgs</run_depend>
+  <run_depend>tf2_ros</run_depend>
+  <run_depend>tf2_msgs</run_depend>
+  <run_depend>soma_llsd_msgs</run_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

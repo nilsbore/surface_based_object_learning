@@ -3,12 +3,8 @@ import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField
 from world_modeling.srv import *
-from soma_io.observation import Observation, TransformationStore
-from soma_io.geometry import *
-from soma_io.state import World, Object
-from soma_io.observation import *
-# SOMA2 stuff
-from soma2_msgs.msg import SOMA2Object
+# soma stuff
+from soma_msgs.msg import SOMAObject
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion
 import sensor_msgs.point_cloud2 as pc2
@@ -17,7 +13,6 @@ import tf
 from recognition_srv_definitions.srv import *
 
 import python_pcd
-from cluster_tracker import SOMAClusterTracker
 import PyKDL
 import tf2_ros
 from cluster_tracking_strategies import ClusterScore
@@ -196,8 +191,6 @@ if __name__ == '__main__':
 #    r = ObjectRecognitionManager()
     print("done, testing")
 
-#    cluster_tracker = SOMAClusterTracker()
-#    cluster_tracker.add_unsegmented_scene(testcl)
 
     rospy.loginfo("-- Waiting for Object Recognition Service --")
     rospy.loginfo("-- 10 SECONDS --")

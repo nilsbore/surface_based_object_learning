@@ -1,3 +1,4 @@
 geometry_msgs/Point input     # the input point
+geometry_msgs/Point pose      # optional, will only check the ROI that is found to be closest to this pose
 ---
 bool result         # whether the point is in a SOMA ROI or not

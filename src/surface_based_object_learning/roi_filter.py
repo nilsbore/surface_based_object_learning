@@ -2,13 +2,8 @@
 import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField
-from world_modeling.srv import *
-from soma_io.observation import Observation, TransformationStore
-from soma_io.geometry import *
-from soma_io.state import World, Object
-from soma_io.observation import *
-# SOMA2 stuff
-from soma2_msgs.msg import SOMA2Object
+# soma stuff
+from soma_msgs.msg import SOMAObject,SOMAROIObject
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion, Point
 import sensor_msgs.point_cloud2 as pc2
@@ -23,7 +18,7 @@ from shapely.geometry.polygon import Polygon
 import python_pcd
 import shapely.geometry
 from shapely.geometry import MultiPoint
-from world_modeling.srv import PointInROI
+from surface_based_object_learning.srv import *
 
 
 class ROIFilter:
@@ -32,53 +27,112 @@ class ROIFilter:
         #rospy.init_node('test_roi_filter_', anonymous = True)
         rospy.loginfo("---created ROI filter ---")
         rospy.loginfo("getting soma service")
-        rospy.wait_for_service('soma2/query_db')
+        rospy.wait_for_service('soma/query_rois')
         rospy.loginfo("done")
         rospy.loginfo("setting up proxy")
-        self.soma_query = rospy.ServiceProxy('soma2/query_db',SOMA2QueryObjs)
+        self.soma_query = rospy.ServiceProxy('soma/query_rois',SOMAQueryROIs)
         rospy.loginfo("done")
         self.gather_rois()
         rospy.loginfo("launching SOMa ROI check server")
         point_check_service = rospy.Service('/check_point_in_soma_roi',PointInROI,self.roi_check_service_cb)
+        point_set_check_service = rospy.Service('/check_point_set_in_soma_roi',PointSetInROI,self.roi_set_check_service_cb)
         rospy.loginfo("SOMa ROI check service running")
+        self.gather_rois()
 
     def roi_check_service_cb(self, req):
         p = self.ros_point_in_roi(req.input)
         return PointInROIResponse(p)
 
-    def gather_rois(self):
-        query = SOMA2QueryObjsRequest()
-        query.query_type = 2
+    def roi_set_check_service_cb(self, req):
+        p = self.ros_point_set_in_roi(req.input,req.pose)
+        return PointSetInROIResponse(p)
+
+    def gather_rois(self,filter_point=None):
+        rospy.loginfo("Gathering ROIs")
+        query = SOMAQueryROIsRequest()
+	query.returnmostrecent = True
         response = self.soma_query(query)
+        #rospy.loginfo(response)
 
         self.soma_polygons = []
+        self.soma_boxes = []
+
+        # seems like there might be a bug with SOMA, quick workaround, just log the IDs
+        visited_ids = []
         #rospy.loginfo("ROI TYPES: ")
         for roi in response.rois:
+            if(roi.id not in visited_ids):
+                visited_ids.append(roi.id)
+                #rospy.loginfo(roi.type)
+                if("NavArea" in roi.type):
+                    #rospy.loginfo(roi.type+" \t SKIPPING")
+                    continue
+                if("Human" in roi.type):
+                    #rospy.loginfo(roi.type+" \t SKIPPING")
+                    continue
+
+                points = roi.posearray.poses
+                box = self.get_roi_as_rect(points)
+                self.soma_boxes.append(box)
+
+                print(roi.type)
+                points_2d = []
+
+                for point in points:
+                    points_2d.append([point.position.x,point.position.y])
+
+                if(len(points_2d) <= 2):
+                    print("Found one SOMA region that isn't a polygon (doesn't have >= 3 points) so I am skipping it")
+                    continue
+
+                polygon = Polygon(points_2d)
+                print(polygon)
+                self.soma_polygons.append(polygon)
+
+        if(filter_point is not None):
+            filter_point = shapely.geometry.Point(filter_point.x,filter_point.y)
+            rospy.loginfo("filtering by pose")
+            filtered_polygons = []
+            filtered_boxes = []
+            b_d = 900000
+            p_d = 900000
+            best_p = None
+            best_b = None
+            for p in self.soma_polygons:
+                ds = p.centroid.distance(filter_point)
+                if(ds < p_d):
+                    p_d = ds
+                    best_p = p
+
+            for p in self.soma_boxes:
+                ds = p.centroid.distance(filter_point)
+                if(ds < b_d):
+                    b_d = ds
+                    best_b = p
+            self.soma_polygons = [best_p]
+            self.soma_boxes = [best_b]
 
 
-            if("NavArea" in roi.type):
-                #rospy.loginfo(roi.type+" \t SKIPPING")
-                continue
-            if("Human" in roi.type):
-                #rospy.loginfo(roi.type+" \t SKIPPING")
-                continue
 
-            #rospy.loginfo(roi.type+" \t ACCEPTING")
+    def get_roi_as_rect(self,points):
+        min_x = 9000
+        max_x = -9000
+        min_y = 9000
+        max_y = -9000
 
-            points = roi.posearray.poses
-            points_2d = []
+        for point in points:
+            pos = point.position
+            if(pos.x > max_x):
+                max_x = pos.x
+            if(pos.x < min_x):
+                min_x = pos.x
 
-            for point in points:
-                points_2d.append([point.position.x,point.position.y])
+            if(pos.y > max_y):
+                max_y = pos.y
+            if(pos.y < min_y):
+                min_y = pos.y
+        return shapely.geometry.box(min_x,min_y,max_x,max_y)
 
-            if(len(points_2d) <= 2):
-                print("Found one SOMA region that isn't a polygon (doesn't have >= 3 points) so I am skipping it")
-                continue
-
-            polygon = Polygon(points_2d)
-            self.soma_polygons.append(polygon)
-
-        #rospy.loginfo("ROI Filter has located %d regions of interest",len(self.soma_polygons))
 
     def get_points_in_rois(self,point_set):
         self.gather_rois()
@@ -87,19 +141,49 @@ class ROIFilter:
             for polygon in self.soma_polygons:
                 if(polygon.contains(point)):
                     ret.append(k)
-
         return ret
 
     def ros_point_in_roi(self,point_in):
         # allows the system to deal with changes made to ROIs online
         # and avoid having to be reloaded
-        self.gather_rois()
-        rospy.loginfo("Checking: " + str(len(self.soma_polygons)) + " SOMa ROIs")
+        #self.gather_rois()
+        #rospy.loginfo("Checking: " + str(len(self.soma_polygons)) + " SOMa ROIs")
+        point = shapely.geometry.Point(point_in.x,point_in.y)
+        for box in self.soma_boxes:
+            if(point.within(box)):
+                #rospy.loginfo("IN ROI:" + str(point))
+                return True
+        #rospy.loginfo("OUTSIDE ROI:" + str(point))
+        return False
+
+    def old_ros_point_in_roi(self,point_in):
+        # allows the system to deal with changes made to ROIs online
+        # and avoid having to be reloaded
+        #self.gather_rois()
+        #rospy.loginfo("Checking: " + str(len(self.soma_polygons)) + " SOMa ROIs")
         point = shapely.geometry.Point(point_in.x,point_in.y)
         for polygon in self.soma_polygons:
             if(polygon.contains(point)):
+                #rospy.loginfo("IN ROI:" + str(point))
                 return True
+        #rospy.loginfo("OUTSIDE ROI:" + str(point))
         return False
+
+    def ros_point_set_in_roi(self,point_in,filter_point):
+        # allows the system to deal with changes made to ROIs online
+        # and avoid having to be reloaded
+        self.gather_rois(filter_point)
+        rospy.loginfo("Checking: " + str(len(self.soma_boxes)) + " SOMa ROIs")
+        output = []
+        for p in point_in:
+            point = shapely.geometry.Point(p.x,p.y)
+            for poly in self.soma_polygons:
+                if(poly.contains(point)):
+                    output.append(True)
+                else:
+                    output.append(False)
+        print("done, processed " + str(len(point_in)) + " points")
+        return output
 
     def point_in_roi(self,point_in):
         # allows the system to deal with changes made to ROIs online
@@ -113,10 +197,12 @@ class ROIFilter:
 
     def accel_point_in_roi(self,point_in):
         point = shapely.geometry.Point(point_in[0],point_in[1])
+        poly = None
         for polygon in self.soma_polygons:
             if(polygon.contains(point)):
-                return True
-        return False
+                poly = polygon
+                return True,poly
+        return False,None
 
     def accel_any_point_in_roi(self,cloud_in):
 

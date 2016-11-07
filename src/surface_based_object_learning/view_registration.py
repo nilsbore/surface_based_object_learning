@@ -5,12 +5,8 @@ import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField
 from world_modeling.srv import *
-from soma_io.observation import Observation, TransformationStore
-from soma_io.geometry import *
-from soma_io.state import World, Object
-from soma_io.observation import *
 # SOMA2 stuff
-from soma2_msgs.msg import SOMA2Object
+from soma_msgs.msg import SOMAObject
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion
 import sensor_msgs.point_cloud2 as pc2
@@ -165,12 +161,12 @@ class ViewAlignmentManager:
             tls = [ts.translation.x,ts.rotation.y,ts.rotation.z]
             # make new clouds out of the segmented clouds in this scene
             transformed_clusters[orig.scene_id] = []
-            for cluster in orig.cluster_list:
+            for cluster in orig.segment_list:
                 # transform data using above transforms, first to cam frame
                 cc = self.transform_cloud(cluster.segmented_pc_camframe,orig.to_map_trans,orig.to_map_rot)
                 # then to aligned map
                 cm = self.transform_cloud(cc,tls,rot)
-                transformed_clusters[orig.scene_id].append([cluster.cluster_id,cm])
+                transformed_clusters[orig.scene_id].append([cluster.segment_id,cm])
 
         return transformed_clusters
 
