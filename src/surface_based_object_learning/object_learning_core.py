@@ -257,7 +257,7 @@ class LearningCore:
                     rospy.logerr("problem updating object models in world/SOMA db. Unable to register merged clouds")
                     rospy.logerr(e)
                     continue
-           else:
+            else:
                 rospy.loginfo("LEARNING CORE: not running view alignment, only one view")
 
             #rospy.loginfo("LEARNING CORE: attempting to update object's recognition label")
