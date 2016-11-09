@@ -8,7 +8,7 @@ import argparse
 import os
 from random import randint
 import cv2
-
+import json
 # view store STUFF
 from mongodb_store.message_store import MessageStoreProxy
 from soma_io.mongo import MongoDocument, MongoTransformable, MongoConnection
@@ -54,6 +54,7 @@ class LearningCore:
         self.cur_sequence_obj_ids = []
         self.cur_view_soma_ids = []
         self.cur_observation_data = None
+        self.queued_soma_objs = []
 
         rospy.loginfo("LEARNING CORE: setting up services")
         process = rospy.Service('/surface_based_object_learning/process_scene',ProcessScene,self.process_scene_callback)
@@ -109,6 +110,7 @@ class LearningCore:
         self.cur_observation_data = None
         self.segment_processor.reset()
         self.cur_episode_id = str(uuid.uuid4())
+        self.queued_soma_objs = []
         rospy.loginfo("LEARNING CORE: -- new episode id: " + self.cur_episode_id)
 
 
@@ -234,12 +236,23 @@ class LearningCore:
     def do_postprocessing(self):
         rospy.loginfo("LEARNING CORE: -- beginning post-processing, attempting view alignment and object label updates -- ")
 
+        if(self.queued_soma_objs):
+            rospy.loginfo("-- inserting " + str(len(self.queued_soma_objs)) + " objects into soma")
+            for k in self.queued_soma_objs:
+                print(k.id)
+            res = self.soma_insert(self.queued_soma_objs)
+            print(res)
+
+
         if(len(self.cur_sequence_obj_ids) == 0):
             rospy.loginfo("LEARNING CORE: -- no segments found in this scene, or if they were they were filtered out by the SOMA region or height filters ")
 
         for object_id in self.cur_sequence_obj_ids:
+            rospy.loginfo("trying to get soma id: " + object_id)
             soma_object = self.get_soma_objects_with_id(object_id)
+            rospy.loginfo("trying to get segment:-" + object_id+"-")
             segment = self.get_segment(object_id)
+            rospy.loginfo("done")
 
             observations = segment.response.observations
             rospy.loginfo("LEARNING CORE: observations for " + str(object_id) + " = " + str(len(observations)))
@@ -248,7 +261,7 @@ class LearningCore:
                 # update world model
                 try:
                     rospy.loginfo("LEARNING CORE: updating world model")
-                    merged_cloud = self.view_alignment_manager.register_views(segment)
+                    merged_cloud = self.view_alignment_manager.register_views(segment.response.observations)
                     rospy.loginfo("LEARNING CORE: updating SOMA obj")
                     soma_objects.objects[0].cloud = merged_cloud
 
@@ -282,17 +295,9 @@ class LearningCore:
     def get_soma_objects_with_id(self,id):
         rospy.loginfo("LEARNING CORE: looking for SOMA objects with id: " + str(id))
         query = SOMAQueryObjsRequest()
-
         query.query_type = 0
-        #query.usetimestep = False
-        #query.uselowertime =  False
-        #query.useuppertime =  False
-        #query.usedates =  False
-        #query.useweekday =  False
-        #query.useroi =  False
-
         query.objectids = ([id])
-        query.objecttypes=['']
+        #query.objecttypes=['']
 
         response = self.soma_get(query)
 
@@ -420,17 +425,24 @@ class LearningCore:
                 self.append_obs_to_segment(target_db_segment.id,[new_segment_observation],self.cur_scene_id)
 
                 # do some sanity checking
-                get_segment_req= self.get_segment(cur_scene_segment_instance.segment_id)
-                seg = get_segment_req.response
-                rospy.loginfo("LEARNING CORE: segment: " + seg.id + " now has " + str(len(seg.observations)) + " observations")
+                get_segment_req = self.get_segment(cur_scene_segment_instance.segment_id)
+                target_db_segment = get_segment_req.response
+                rospy.loginfo("LEARNING CORE: segment: " + target_db_segment.id + " now has " + str(len(target_db_segment.observations)) + " observations")
 
                 cur_soma_obj = None
                 soma_objs = self.get_soma_objects_with_id(target_db_segment.id)
 
                 if(soma_objs.objects):
-                    rospy.loginfo("LEARNING CORE: soma has this object")
                     cur_soma_obj = soma_objs.objects[0]
                     # nothing to do in this case?
+
+                for k in self.queued_soma_objs:
+                    if(k.id is target_db_segment.id):
+                        cur_soma_obj = k
+                        break
+
+                if(cur_soma_obj):
+                    rospy.loginfo("LEARNING CORE: soma has this object")
 
                 else:
                     rospy.loginfo("LEARNING CORE: soma doesn't have this object")
@@ -440,8 +452,16 @@ class LearningCore:
                     try:
                         cur_soma_obj = SOMAObject()
                         cur_soma_obj.id = target_db_segment.id
+                        rospy.loginfo("LEARNING CORE: segment: " + target_db_segment.id + " will have SOMA id " + target_db_segment.id)
+
                         cur_soma_obj.type = "unknown"
                         #cur_soma_obj.waypoint = self.cur_observation_data['waypoint']
+
+                        meta_data = {}
+                        meta_data["source"] = "surface_based_object_learning"
+                        meta_data["waypoint"] = self.cur_observation_data['waypoint']
+
+                        cur_soma_obj.metadata = json.dumps(meta_data)
 
                         # either way we want to record this, so just do it here?
                         cur_soma_obj.cloud = new_segment_observation.map_cloud
@@ -452,8 +472,12 @@ class LearningCore:
 
                         #cur_soma_obj.sweepCenter = self.cur_observation_data['robot_pose']
 
-                        rospy.loginfo("LEARNING CORE: inserting into SOMA")
-                        res = self.soma_insert([cur_soma_obj])
+                        rospy.loginfo("LEARNING CORE: inserting into SOMA once views are done")
+
+                        self.queued_soma_objs.append(cur_soma_obj)
+                        #res = self.soma_insert([cur_soma_obj])
+
+
                     except Exception, e:
                         rospy.logerr("unable to insert into SOMA. Is the database server running?")
                         rospy.logerr(e)

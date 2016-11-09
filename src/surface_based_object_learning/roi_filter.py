@@ -54,7 +54,6 @@ class ROIFilter:
         #rospy.loginfo(response)
 
         self.soma_polygons = []
-        self.soma_boxes = []
 
         # seems like there might be a bug with SOMA, quick workaround, just log the IDs
         visited_ids = []
@@ -71,8 +70,6 @@ class ROIFilter:
                     continue
 
                 points = roi.posearray.poses
-                box = self.get_roi_as_rect(points)
-                self.soma_boxes.append(box)
 
                 print(roi.type)
                 points_2d = []
@@ -92,45 +89,17 @@ class ROIFilter:
             filter_point = shapely.geometry.Point(filter_point.x,filter_point.y)
             rospy.loginfo("filtering by pose")
             filtered_polygons = []
-            filtered_boxes = []
             b_d = 900000
             p_d = 900000
             best_p = None
-            best_b = None
             for p in self.soma_polygons:
                 ds = p.centroid.distance(filter_point)
                 if(ds < p_d):
                     p_d = ds
                     best_p = p
-
-            for p in self.soma_boxes:
-                ds = p.centroid.distance(filter_point)
-                if(ds < b_d):
-                    b_d = ds
-                    best_b = p
             self.soma_polygons = [best_p]
-            self.soma_boxes = [best_b]
 
 
-
-    def get_roi_as_rect(self,points):
-        min_x = 9000
-        max_x = -9000
-        min_y = 9000
-        max_y = -9000
-
-        for point in points:
-            pos = point.position
-            if(pos.x > max_x):
-                max_x = pos.x
-            if(pos.x < min_x):
-                min_x = pos.x
-
-            if(pos.y > max_y):
-                max_y = pos.y
-            if(pos.y < min_y):
-                min_y = pos.y
-        return shapely.geometry.box(min_x,min_y,max_x,max_y)
 
 
     def get_points_in_rois(self,point_set):
@@ -148,8 +117,8 @@ class ROIFilter:
         self.gather_rois()
         #rospy.loginfo("Checking: " + str(len(self.soma_polygons)) + " SOMa ROIs")
         point = shapely.geometry.Point(point_in.x,point_in.y)
-        for box in self.soma_boxes:
-            if(point.within(box)):
+        for poly in self.soma_polygons:
+            if(poly.contains(point)):
                 #rospy.loginfo("IN ROI:" + str(point))
                 return True
         #rospy.loginfo("OUTSIDE ROI:" + str(point))
@@ -159,7 +128,6 @@ class ROIFilter:
         # allows the system to deal with changes made to ROIs online
         # and avoid having to be reloaded
         self.gather_rois(filter_point)
-        rospy.loginfo("Checking: " + str(len(self.soma_boxes)) + " SOMa ROIs")
         output = []
         for p in point_in:
             point = shapely.geometry.Point(p.x,p.y)
@@ -183,8 +151,8 @@ class ROIFilter:
 
     def accel_point_in_roi(self,point_in):
         point = shapely.geometry.Point(point_in[0],point_in[1])
-        for box in self.soma_boxes:
-            if(point.within(box)):
+        for polygon in self.soma_polygons:
+            if(polygon.contains(point)):
                 #rospy.loginfo("IN ROI:" + str(point))
                 return True
         #rospy.loginfo("OUTSIDE ROI:" + str(point))

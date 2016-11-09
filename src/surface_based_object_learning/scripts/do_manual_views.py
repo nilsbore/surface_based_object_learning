@@ -32,7 +32,7 @@ if __name__ == '__main__':
             break
         print("getting cloud")
         cloud = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2)
-        process_scene(cloud,"home")
+        process_scene(cloud,"WayPoint1")
         print("done")
     print("ending sequence")
     end_obs()

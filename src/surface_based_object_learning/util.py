@@ -52,7 +52,6 @@ class TransformationStore():
 
     def msg_to_transformer(self,msg):
         t = tf.TransformerROS()
-        transforms = TransformationStore.unpickle(msg.msg)
-        for transform in transforms._transformations:
+        for transform in msg.transforms:
             t.setTransform(transform)
         return t

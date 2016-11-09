@@ -4,28 +4,31 @@
 import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField
-from world_modeling.srv import *
+#from world_modeling.srv import *
 # SOMA2 stuff
 from soma_msgs.msg import SOMAObject
 from soma_manager.srv import *
 from geometry_msgs.msg import Pose, Transform, Vector3, Quaternion
 import sensor_msgs.point_cloud2 as pc2
+from soma_llsd_msgs.msg import *
+from soma_llsd.srv import *
 #import python_pcd
 import tf
 # reg stuff #
 from observation_registration_services.srv import *
 import PyKDL
 import tf2_ros
+from util import TransformationStore
 
 class ViewAlignmentManager:
 
     def __init__(self):
         #rospy.init_node('world_modeling_view_alignment', anonymous = True)
-        rospy.loginfo("---created view alignment manager --")
-        rospy.loginfo("waiting for view alignment service additional_view_registration_server from strands_3d_mapping")
+        rospy.loginfo("VIEW REG: ---created view alignment manager --")
+        rospy.loginfo("VIEW REG: waiting for view alignment service additional_view_registration_server from strands_3d_mapping")
         rospy.wait_for_service('/additional_view_registration_server',10)
         self.reg_serv = rospy.ServiceProxy('/additional_view_registration_server',AdditionalViewRegistrationService)
-        rospy.loginfo("got it")
+        rospy.loginfo("VIEW REG: got it")
 
 
     def transform_to_kdl(self,t):
@@ -113,7 +116,7 @@ class ViewAlignmentManager:
             rospy.logwarn("Unable to call view registration service")
             #rospy.logwarn(e)
 
-        rospy.loginfo("done, response: ")
+        rospy.loginfo("VIEW REG: done, response: ")
         transform = response.observation_transform
         trans = [transform.translation.x,transform.translation.y,transform.translation.z]
         rot = [transform.rotation.x,transform.rotation.y,transform.rotation.z,transform.rotation.w]
@@ -123,7 +126,7 @@ class ViewAlignmentManager:
 
 
     def register_scenes(self,cur_scene,prev_scene,root_scene):
-        rospy.loginfo("running transforms")
+        rospy.loginfo("VIEW REG: running transforms")
 
         cam_cur = self.transform_cloud(cur_scene.unfiltered_cloud,cur_scene.to_map_trans,cur_scene.to_map_rot)
         cam_prev = self.transform_cloud(prev_scene.unfiltered_cloud,prev_scene.to_map_trans,prev_scene.to_map_rot)
@@ -131,7 +134,7 @@ class ViewAlignmentManager:
 
         bases = [root_scene,prev_scene,cur_scene]
         scenes = [cam_root,cam_prev,cam_cur]
-        rospy.loginfo("done")
+        rospy.loginfo("VIEW REG: done")
 
         map_root_t = self.to_transform(root_scene.to_map_trans,root_scene.to_map_rot)
         map_prev_t = self.to_transform(prev_scene.to_map_trans,prev_scene.to_map_rot)
@@ -140,8 +143,8 @@ class ViewAlignmentManager:
         transforms = [map_root_t,map_prev_t,map_cur_t]
 
         # align these clouds
-        rospy.loginfo("calling alignment service")
-        rospy.loginfo("scenes: " + str(len(scenes)))
+        rospy.loginfo("VIEW REG: calling alignment service")
+        rospy.loginfo("VIEW REG: scenes: " + str(len(scenes)))
 
 
         response = None
@@ -151,7 +154,7 @@ class ViewAlignmentManager:
             rospy.logwarn("Unable to call view registration service")
             rospy.logwarn(e)
 
-        rospy.loginfo("done, response: ")
+        rospy.loginfo("VIEW REG: done, response: ")
         print(response)
         view_trans = response.additional_view_transforms
         transformed_clusters = {}
@@ -176,20 +179,24 @@ class ViewAlignmentManager:
         obs_transforms = []
         time = []
         self.child_camera_frame = "map"
-        rospy.loginfo("beginning view registration ")
-        for o in observations:
-            rospy.loginfo("getting tf ")
-            tf_p = o.get_message('/tf')
-            t_st = TransformationStore().msg_to_transformer(tf_p)
+        rospy.loginfo("VIEW REG: beginning view registration ")
 
-            cam_cloud = o.get_message('object_cloud_camframe')
-            #rospy.loginfo("cam header: ")
-            #rospy.loginfo(cam_cloud.header)
-            obs_cloud = o.get_message('/head_xtion/depth_registered/points')
+        rospy.wait_for_service('/soma_llsd/get_scene')
+        self.get_scene = rospy.ServiceProxy('/soma_llsd/get_scene',GetScene)
+
+        for o in observations:
+            rospy.loginfo("VIEW REG: getting tf ")
+
+            obs_scene = self.get_scene(o.scene_id)
+            tf_p = obs_scene.response.transform
+            t_st = TransformationStore().msg_to_transformer(tf_p)
+            cam_cloud = o.camera_cloud
+            obs_cloud = obs_scene.response.cloud
+
             self.root_camera_frame = obs_cloud.header.frame_id
 
-            c_time = t_st.getLatestCommonTime("map",self.root_camera_frame)
-            t,r = t_st.lookupTransform("map",self.root_camera_frame,c_time)
+            #c_time = t_st.getLatestCommonTime("map",self.root_camera_frame)
+            t,r = t_st.lookupTransform("map",self.root_camera_frame,rospy.Time(0))
             cam_trans = geometry_msgs.msg.Transform()
             cam_trans.translation.x = t[0]
             cam_trans.translation.y = t[1]
@@ -200,33 +207,15 @@ class ViewAlignmentManager:
             cam_trans.rotation.z = r[2]
             cam_trans.rotation.w = r[3]
 
-            #cam_cloud = self.transform_cloud(cam_cloud,[t[0,t[1],t[2]]],[r[0],r[1],r[2],r[3]])
-            #obs_cloud = self.transform_cloud(obs_cloud,[t[0,t[1],t[2]]],[r[0],r[1],r[2],r[3]])
-
             seg_clouds.append(cam_cloud)
             obs_clouds.append(obs_cloud)
 
-        #    rospy.loginfo("looking for transform")
-        #    c_time = t_st.getLatestCommonTime("map",self.root_camera_frame)
-        #    trans,rot = t_st.lookupTransform("map",self.root_camera_frame,c_time)
-
-        #    cur_trans = geometry_msgs.msg.Transform()
-        #    cur_trans.translation.x = trans[0]
-        #    cur_trans.translation.y = trans[1]
-        #    cur_trans.translation.z = trans[2]
-
-        #    cur_trans.rotation.x = rot[0]
-        #    cur_trans.rotation.y = rot[1]
-            #cur_trans.rotation.z = rot[2]
-            #cur_trans.rotation.w = rot[3]
-
-        #    rospy.loginfo(cur_trans)
             obs_transforms.append(cam_trans)
 
 
-        rospy.loginfo("got: " + str(len(seg_clouds)) + " clouds for object")
+        rospy.loginfo("VIEW REG: got: " + str(len(seg_clouds)) + " clouds for object")
 
-        rospy.loginfo("running service call")
+        rospy.loginfo("VIEW REG: running service call")
         response = self.reg_serv(additional_views=obs_clouds,additional_views_odometry_transforms=obs_transforms)
 
         view_trans = response.additional_view_transforms
@@ -235,7 +224,7 @@ class ViewAlignmentManager:
         cloud_id = 0
         #transformed_obs_clouds = []
         transformed_seg_clouds = []
-        rospy.loginfo("-- aligning clouds -- ")
+        rospy.loginfo("VIEW REG: -- aligning clouds -- ")
         for transform,seg_cloud in zip(view_trans,seg_clouds):
             rot = [transform.rotation.x,transform.rotation.y,transform.rotation.z,transform.rotation.w]
             trs = [transform.translation.x,transform.rotation.y,transform.rotation.z]
@@ -253,7 +242,7 @@ class ViewAlignmentManager:
             merged_cloud = self.merge_pcs(transformed_seg_clouds)
 
     #    if(merge_and_write):
-        #    rospy.loginfo("-- merging and writing clouds to files --")
+        #    rospy.loginfo("VIEW REG: -- merging and writing clouds to files --")
         #    merged_cloud = self.merge_pcs(obs_clouds)
         #    python_pcd.write_pcd("merged_obs_non_aligned.pcd", merged_cloud)
 
@@ -265,38 +254,23 @@ class ViewAlignmentManager:
 
         #    python_pcd.write_pcd("merged_seg_aligned.pcd", merged_cloud)
 
-        rospy.loginfo("success!")
+        rospy.loginfo("VIEW REG: success!")
 
 
         return merged_cloud
 
 if __name__ == '__main__':
-    rospy.loginfo("hi")
+    rospy.loginfo("VIEW REG: hi")
     rospy.init_node('test2', anonymous = False)
-    world_model = World(server_host='localhost',server_port=62345)
-    obj = world_model.get_object("130c4040-50a2-4318-aa25-9b5a1c0b3810")
-    rospy.loginfo("got object")
+    rospy.wait_for_service('/soma_llsd/get_segment')
+    get_segment = rospy.ServiceProxy('/soma_llsd/get_segment',GetSegment)
+    rospy.loginfo("VIEW REG: got object")
+    obj = get_segment("c9a4a17e-fd77-4523-945f-e8a22db76201")
 
-    #rospy.loginfo(obj._point_cloud)
-
-    rospy.loginfo("observations: " + str(len(obj._observations)))
-    pub = rospy.Publisher('/world_modeling/align_and_merge_test', PointCloud2, queue_size=10)
+    rospy.loginfo("VIEW REG: observations: " + str(len(obj.response.observations)))
+    #pub = rospy.Publisher('/world_modeling/align_and_merge_test', PointCloud2, queue_size=10)
 
     vr = ViewAlignmentManager()
-    merged_cloud = vr.register_views(obj._observations, True)
-
-    python_pcd.write_pcd("merged.pcd", merged_cloud)
-
-    message_proxy = MessageStoreProxy(collection="ws_merged_aligned_clouds")
-    msg_id = message_proxy.insert(merged_cloud)
-    mso = MessageStoreObject(
-        database=message_proxy.database,
-        collection=message_proxy.collection,
-        obj_id=msg_id,
-        typ=merged_cloud._type)
-
-    obj._point_cloud = mso
-
-    pub.publish(merged_cloud)
+    merged_cloud = vr.register_views(obj.response.observations)
 
     rospy.spin()
