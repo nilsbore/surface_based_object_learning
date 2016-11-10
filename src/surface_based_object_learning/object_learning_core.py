@@ -11,7 +11,6 @@ import cv2
 import json
 # view store STUFF
 from mongodb_store.message_store import MessageStoreProxy
-from soma_io.mongo import MongoDocument, MongoTransformable, MongoConnection
 from soma_llsd_msgs.msg import Segment,Observation,Scene
 
 # ROS stuff
