@@ -252,6 +252,10 @@ class LearningCore:
             soma_object = self.get_soma_objects_with_id(object_id)
             rospy.loginfo("trying to get segment:-" + object_id+"-")
             segment = self.get_segment(object_id)
+            if(segment.result is False):
+                rospy.logerr("Could not access low-level data for object")
+                rospy.logerr("This is catastrophic")
+                continue
             rospy.loginfo("done")
 
             observations = segment.response.observations
@@ -263,9 +267,9 @@ class LearningCore:
                     rospy.loginfo("LEARNING CORE: updating world model")
                     merged_cloud = self.view_alignment_manager.register_views(segment.response.observations)
                     rospy.loginfo("LEARNING CORE: updating SOMA obj")
-                    soma_objects.objects[0].cloud = merged_cloud
+                    soma_object.objects[0].cloud = merged_cloud
 
-                    self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
+                    self.soma_update(object=soma_object.objects[0],db_id=str(object_id))
                 except Exception,e:
                     rospy.logerr("problem updating object models in world/SOMA db. Unable to register merged clouds")
                     rospy.logerr(e)
@@ -346,6 +350,11 @@ class LearningCore:
         cur_scene = scene
         self.cur_view_soma_ids = []
         have_previous_scene = False
+        data_dict = {}
+        data_dict["source"] = "surface_based_object_learning"
+        data_dict["waypoint"] = self.cur_observation_data['waypoint']
+
+        meta_data = json.dumps(data_dict)
 
         # if this is not scene 0, ie. we have a previous scene to compare to
         if(prev_scene is not None):
@@ -392,7 +401,7 @@ class LearningCore:
             # if this the first view, or a new segment
             if not target_db_segment:
                 rospy.loginfo("LEARNING CORE: creating NEW segment")
-                request = self.insert_segment("{}",self.cur_scene_id,[])
+                request = self.insert_segment(meta_data,self.cur_scene_id,[])
                 if(request.result is False):
                     rospy.logerr("Unable to insert segment, this is catastrophic")
                     return
@@ -411,7 +420,7 @@ class LearningCore:
                 new_segment_observation = Observation()
                 #new_segment_observation.id =  I'm ignoring this because if it's left blank, the service generates one for you
                 new_segment_observation.timestamp = self.cur_observation_data['timestamp']
-                new_segment_observation.meta_data = "{}"
+                new_segment_observation.meta_data = meta_data
 
                 new_segment_observation.pose =  cur_scene_segment_instance.map_centroid # centroid in map co-ordinates
                 new_segment_observation.map_cloud =  cur_scene_segment_instance.segmented_pc_mapframe #segmented cloud in map co-ordinates
@@ -457,11 +466,9 @@ class LearningCore:
                         cur_soma_obj.type = "unknown"
                         #cur_soma_obj.waypoint = self.cur_observation_data['waypoint']
 
-                        meta_data = {}
-                        meta_data["source"] = "surface_based_object_learning"
-                        meta_data["waypoint"] = self.cur_observation_data['waypoint']
 
-                        cur_soma_obj.metadata = json.dumps(meta_data)
+
+                        cur_soma_obj.metadata = meta_data
 
                         # either way we want to record this, so just do it here?
                         cur_soma_obj.cloud = new_segment_observation.map_cloud

@@ -520,7 +520,7 @@ class SegmentedScene:
                 al /= pc
                 print("AVG LUMA: " + str(al))
 
-                #f = cv2.imwrite("obj_segments_image/pixels/"+str(int(un_px))+'.jpeg',cur_segment.cv_rgb_image_cropped_unpadded)
+                #f = cv2.imwrite("obj_segments_image/pixels/"+str(int(un_px))+'.q',cur_segment.cv_rgb_image_cropped_unpadded)
                 #print("done writing")
                 #print(f)
                 #cv2.imwrite("obj_segments_image/luma/"+str(int(al))+'.jpeg',cur_segment.cv_rgb_image_cropped_unpadded)
