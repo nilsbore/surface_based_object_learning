@@ -68,8 +68,14 @@ class ROIFilter:
                 if("Human" in roi.type):
                     #rospy.loginfo(roi.type+" \t SKIPPING")
                     continue
+		if("Robot" in roi.type):
+		    continue
+		if("Atrium" in roi.type):
+		    continue
 
                 points = roi.posearray.poses
+
+		print("found roi type:" + roi.type)
 
                 print(roi.type)
                 points_2d = []
