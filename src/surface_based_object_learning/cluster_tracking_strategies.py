@@ -81,9 +81,12 @@ class OctomapSimilarityTrackerStrategy(ClusterTrackingStrategy):
                     best_score = score
                     best_segment = prev_seg
             cur_seg.assigned = True
-            best_segment.assigned = True
-            rospy.loginfo("\nbest cluster for " + cur_seg.segment_id + " found at cluster with id " + best_segment.segment_id + " and score " + str(best_score))
-            cur_seg.segment_id = best_segment.segment_id
+            if(best_segment is None):
+                rospy.loginfo("Unable to find a segment that is appropriate for linking")
+            else:
+                best_segment.assigned = True
+                rospy.loginfo("\nbest cluster for " + cur_seg.segment_id + " found at cluster with id " + best_segment.segment_id + " and score " + str(best_score))
+                cur_seg.segment_id = best_segment.segment_id
 
 
 
