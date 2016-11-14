@@ -127,6 +127,7 @@ class LearningCore:
         rospy.loginfo("LEARNING CORE: -- received signal to terminate sequence of observations --")
         rospy.loginfo("LEARNING CORE: ")
         self.do_postprocessing()
+        self.clean_up_obs()
         return TriggerResponse(True,"Observations Ending: Assuming all previous observations were from the same sequence.")
 
     def get_camera_info_topic(self):
