@@ -441,11 +441,12 @@ class LearningCore:
                 soma_objs = self.get_soma_objects_with_id(target_db_segment.id)
 
                 if(soma_objs.objects):
+                    rospy.loginfo("soma has this object")
                     cur_soma_obj = soma_objs.objects[0]
                     # nothing to do in this case?
 
                 for k in self.queued_soma_objs:
-                    if(k.id is target_db_segment.id):
+                    if(k.id in target_db_segment.id):
                         cur_soma_obj = k
                         break
 
