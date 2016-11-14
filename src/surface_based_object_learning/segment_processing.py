@@ -207,7 +207,7 @@ class SegmentedScene:
         self.to_map_rot = rotation
 
         bridge = CvBridge()
-        cv_rgb_image = bridge.imgmsg_to_cv2(scene_rgb_img,"bgr8")
+        cv_rgb_image = bridge.imgmsg_to_cv2(scene_rgb_img,encoding="rgb8")
         cv_depth_image = bridge.imgmsg_to_cv2(scene_depth_img)
 
         #print("writing cur scene")
