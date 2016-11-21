@@ -227,6 +227,12 @@ class SegmentedScene:
             map_points_data = []
             image_mask = np.zeros(cv_rgb_image.shape,np.uint8)
 
+            if(len(root_segment.data) > 500 and len(root_segment.data) < 5000):
+                rospy.loginfo("cluster looks like the right size")
+            else:
+                rospy.loginfo("cluster not the right size")
+                continue
+
             rospy.loginfo("--- segment ----")
 
             cur_segment = SegmentedCluster(root_segment.data)
@@ -265,7 +271,13 @@ class SegmentedScene:
             sc_roi_check = False
             unique_rgb = set()
             rgb_points = []
+
+
             for points in cur_segment.data:
+
+
+
+
                 # store the roxe world transformed point too
                 pt_s = PointStamped()
                 pt_s.header = "/map"
