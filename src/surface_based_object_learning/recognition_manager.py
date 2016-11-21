@@ -2,7 +2,7 @@
 import roslib
 import rospy
 from sensor_msgs.msg import PointCloud2, PointField
-from world_modeling.srv import *
+#from world_modeling.srv import *
 # soma stuff
 from soma_msgs.msg import SOMAObject
 from soma_manager.srv import *

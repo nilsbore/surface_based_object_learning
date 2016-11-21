@@ -16,7 +16,7 @@ from soma_llsd_msgs.msg import Segment,Observation,Scene
 # ROS stuff
 from sensor_msgs.msg import PointCloud2, PointField
 from segment_processing import SegmentProcessor
-from recognition_manager import ObjectRecognitionManager
+#from recognition_manager import ObjectRecognitionManager
 from view_registration import ViewAlignmentManager
 from sensor_msgs.msg import Image, PointCloud2, CameraInfo, JointState
 from std_srvs.srv import Trigger, TriggerResponse
@@ -34,7 +34,7 @@ from soma_manager.srv import *
 from soma_llsd.srv import *
 
 # recog stuff
-from recognition_srv_definitions.srv import *
+#from recognition_srv_definitions.srv import *
 
 import uuid
 #import python_pcd
@@ -77,7 +77,7 @@ class LearningCore:
         rospy.wait_for_service('/soma/update_object')
         rospy.loginfo("LEARNING CORE: done")
         self.soma_update = rospy.ServiceProxy('soma/update_object',SOMAUpdateObject)
-        self.recog_manager = None
+        #self.recog_manager = None
         rospy.loginfo("LEARNING CORE: setting up view alignment manager")
         self.view_alignment_manager = ViewAlignmentManager()
 
@@ -195,13 +195,13 @@ class LearningCore:
 
             scene.waypoint = waypoint
 
-            if(self.recog_manager):
-                rospy.loginfo("LEARNING CORE: ---- Running Object Recognition ----")
-                recognition = self.recog_manager.recognise_scene(cloud)
-                if(recognition is True):
-                    self.recog_manager.assign_labels(scene)
-            else:
-                rospy.logwarn("Object recognition service not found, try restarting is the node running?")
+            #if(self.recog_manager):
+            #    rospy.loginfo("LEARNING CORE: ---- Running Object Recognition ----")
+            #    recognition = self.recog_manager.recognise_scene(cloud)
+            #    if(recognition is True):
+            #        self.recog_manager.assign_labels(scene)
+            #else:
+            #    rospy.logwarn("Object recognition service not found, try restarting is the node running?")
 
             self.assign_segments(scene,self.segment_processor.prev_scene,extra_data)
             self.pending_obs.append(scene)
