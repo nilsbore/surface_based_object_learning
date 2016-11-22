@@ -77,9 +77,10 @@ class LearningCore:
         rospy.wait_for_service('/soma/update_object')
         rospy.loginfo("LEARNING CORE: done")
         self.soma_update = rospy.ServiceProxy('soma/update_object',SOMAUpdateObject)
-        #self.recog_manager = None
+
+
         rospy.loginfo("LEARNING CORE: setting up view alignment manager")
-        self.view_alignment_manager = ViewAlignmentManager()
+        #self.view_alignment_manager = ViewAlignmentManager()
 
         rospy.loginfo("LEARNING CORE: getting LLSD services")
         rospy.wait_for_service('/soma_llsd/insert_scene')
