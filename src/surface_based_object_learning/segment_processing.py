@@ -197,8 +197,8 @@ class SegmentedScene:
         else:
             scene_rgb_img = self.offline_observation_data['rgb_image']
             scene_depth_img = self.offline_observation_data['depth_image']
-            #tf_st = TransformationStore().msg_to_transformer(self.offline_observation_data['tf'])
-            #self.transformation_store = tf_st
+            tf_st = TransformationStore().msg_to_transformer(self.offline_observation_data['tf'])
+            self.transformation_store = tf_st
             translation,rotation = tf_st.lookupTransform("map", self.starting_camera_frame, rospy.Time())
             self.camera_msg = self.offline_observation_data['camera_info']
 
@@ -580,7 +580,7 @@ class SegmentProcessor:
     def __init__(self):
         #rospy.init_node('CT_TEST_NODE', anonymous = True)
         rospy.loginfo("--created segment tracker--")
-        self.segmentation_service = "/pcl_segmentation_service/pcl_segmentation"
+        self.segmentation_service = "/object_gestalt_segmentation"
         self.cur_scene = None
         self.prev_scene = None
         self.root_scene = None
@@ -588,7 +588,7 @@ class SegmentProcessor:
         self.view_alignment_manager = ViewAlignmentManager()
         self.use_bham_seg = False
         if(self.use_bham_seg is False):
-            self.vienna_seg = rospy.ServiceProxy("/pcl_segmentation_service/pcl_segmentation", segment)
+            self.vienna_seg = rospy.ServiceProxy(self.segmentation_service, segment)
         else:
             self.bham_segmenter = Segmentation()
 

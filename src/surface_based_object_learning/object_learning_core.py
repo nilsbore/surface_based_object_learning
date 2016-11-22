@@ -80,7 +80,7 @@ class LearningCore:
 
 
         rospy.loginfo("LEARNING CORE: setting up view alignment manager")
-        #self.view_alignment_manager = ViewAlignmentManager()
+        self.view_alignment_manager = ViewAlignmentManager()
 
         rospy.loginfo("LEARNING CORE: getting LLSD services")
         rospy.wait_for_service('/soma_llsd/insert_scene')
@@ -100,6 +100,8 @@ class LearningCore:
         rospy.loginfo("LEARNING CORE: -- node setup completed --")
         self.setup_clean = True
 
+        #rospy.spin()
+    def begin_spinning(self):
         rospy.spin()
 
     def clean_up_obs(self):
@@ -179,6 +181,7 @@ class LearningCore:
                 rospy.logerr("couldn't add scene to view store, this is catastrophic")
 
         except Exception,e:
+            rospy.loginfo(e)
             rospy.loginfo("LEARNING CORE: failed to add view to view store")
 
 
@@ -338,11 +341,13 @@ class LearningCore:
                 rospy.loginfo("LEARNING CORE: *** Making observation using historic robot data")
                 self.cur_observation_data['rgb_image'] = extra_data['rgb_image']
                 self.cur_observation_data['camera_info'] = extra_data['camera_info']
-                self.cur_observation_data['scene_cloud'] = extra_data['cloud']
+                self.cur_observation_data['scene_cloud'] = extra_data['scene_cloud']
                 self.cur_observation_data['robot_pose'] = extra_data['robot_pose']
-                self.cur_observation_data['metadata'] = extra_data['data']
+                self.cur_observation_data['metadata'] = extra_data['metadata']
+                self.cur_observation_data['timestamp'] = extra_data['timestamp']
                 self.cur_observation_data['tf'] = extra_data['tf']
                 self.cur_observation_data['depth_image'] = extra_data['depth_image']
+                self.cur_observation_data['waypoint'] = self.cur_waypoint
 
         return self.cur_observation_data
 
@@ -514,4 +519,5 @@ if __name__ == '__main__':
         port = str(vars(args)['db_port'][0])
 
         rospy.loginfo("LEARNING CORE: got db_hostname as: " + hostname + " got db_port as: " + port)
-        world_state_manager = LearningCore(hostname,port)
+        core = LearningCore(hostname,port)
+        core.begin_spinning()
