@@ -35,8 +35,14 @@ class ROIFilter:
         rospy.loginfo("launching SOMa ROI check server")
         point_check_service = rospy.Service('/check_point_in_soma_roi',PointInROI,self.roi_check_service_cb)
         point_set_check_service = rospy.Service('/check_point_set_in_soma_roi',PointSetInROI,self.roi_set_check_service_cb)
+
+        point_set_check_service = rospy.Service('/get_closest_roi_to_robot',GetROIClosestToRobot,self.get_closest_roi_to_robot_cb)
         rospy.loginfo("SOMa ROI check service running")
         self.gather_rois()
+
+    def get_closest_roi_to_robot_cb(self, req):
+        p = self.get_closest_roi_to_robot(req.pose)
+        return GetROIClosestToRobotResponse(p)
 
     def roi_check_service_cb(self, req):
         p = self.ros_point_in_roi(req.input)
@@ -63,15 +69,17 @@ class ROIFilter:
                 visited_ids.append(roi.id)
                 #rospy.loginfo(roi.type)
                 if("NavArea" in roi.type):
-                    #rospy.loginfo(roi.type+" \t SKIPPING")
+                #rospy.loginfo(roi.type+" \t SKIPPING")
                     continue
                 if("Human" in roi.type):
-                    #rospy.loginfo(roi.type+" \t SKIPPING")
+                #rospy.loginfo(roi.type+" \t SKIPPING")
                     continue
-		if("Robot" in roi.type):
-		    continue
-		if("Atrium" in roi.type):
-		    continue
+
+                if("Robot" in roi.type):
+                    continue
+
+                if("Atrium" in roi.type):
+                    continue
 
                 points = roi.posearray.poses
 
@@ -106,6 +114,10 @@ class ROIFilter:
             self.soma_polygons = [best_p]
 
 
+
+    def get_closest_roi_to_robot(self,filter_point):
+        self.gather_rois(filter_point)
+        return self.soma_polygons[0]
 
 
     def get_points_in_rois(self,point_set):
@@ -252,19 +264,10 @@ if __name__ == '__main__':
     rospy.init_node('test_roi_filter_', anonymous = True)
     rospy.loginfo("loading ROI Filter")
     r = ROIFilter()
-
-
-    rospy.loginfo("getting service")
-
-    point = geometry_msgs.msg.Point()
-    point.x = 10
-    point.y = 10
-    point.z = 10
-
-    service = rospy.ServiceProxy('/check_point_in_soma_roi',PointInROI)
-    out = service(point)
-
-    rospy.loginfo("the result is: ")
-    rospy.loginfo(out)
-    rospy.loginfo("done!")
-    rospy.spin()
+    print("getting pose closest to robot")
+    pose = rospy.wait_for_message("/robot_pose", geometry_msgs.msg.Pose, timeout=10.0)
+    print("position:")
+    print(pose)
+    roi = r.get_closest_roi_to_robot(pose.position)
+    print("done")
+    print(roi)

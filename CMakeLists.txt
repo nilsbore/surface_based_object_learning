@@ -5,11 +5,11 @@ project(surface_based_object_learning)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  geometry_msgs
   rospy
   std_msgs
   message_generation
   sensor_msgs
-  geometry_msgs
   tf2_ros
   tf2_msgs
   soma_llsd_msgs
@@ -61,6 +61,7 @@ find_package(catkin REQUIRED COMPONENTS
     ProcessScene.srv
     PointInROI.srv
     PointSetInROI.srv
+    GetROIClosestToRobot.srv
 #   Service2.srv
  )
 
@@ -76,7 +77,6 @@ find_package(catkin REQUIRED COMPONENTS
    DEPENDENCIES
     std_msgs
     sensor_msgs
-    geometry_msgs
     tf2_msgs
  )
 ###################################
@@ -91,7 +91,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES cluster_tracker
-  CATKIN_DEPENDS message_runtime
+  CATKIN_DEPENDS geometry_msgs message_runtime
 #  DEPENDS system_lib
 )
 
