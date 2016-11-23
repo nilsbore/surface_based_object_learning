@@ -28,7 +28,8 @@ from view_registration import ViewAlignmentManager
 #import pcl
 #from bham_seg import Segmentation
 from util import TransformationStore
-
+from bham_seg_filter.srv import *
+from surface_based_object_learning.srv import *
 
 class BBox():
     """ Bounding box of an object with getter functions.
@@ -580,30 +581,31 @@ class SegmentProcessor:
     def __init__(self):
         #rospy.init_node('CT_TEST_NODE', anonymous = True)
         rospy.loginfo("--created segment tracker--")
-        self.segmentation_service = "/object_gestalt_segmentation"
+        self.seg_srv_topic = "/bham_filtered_segmentation/segment"
         self.cur_scene = None
         self.prev_scene = None
         self.root_scene = None
         self.roi_filter = ROIFilter()
         self.view_alignment_manager = ViewAlignmentManager()
-        self.use_bham_seg = False
-        if(self.use_bham_seg is False):
-            self.vienna_seg = rospy.ServiceProxy(self.segmentation_service, segment)
-        else:
-            self.bham_segmenter = Segmentation()
+        self.segmentation_service = rospy.ServiceProxy(self.seg_srv_topic, bham_seg, 10)
 
     def reset(self):
         self.cur_scene = None
         self.prev_scene = None
         self.root_scene = None
 
-    def segment_scene(self,input_cloud):
-        if(self.use_bham_seg):
-            rospy.loginfo("Segmenting with BHAM SEG")
-            return self.bham_segmenter.segment(input_cloud)
-        else:
-            rospy.loginfo("Segmenting with VIENNA SEG")
-            return self.vienna_seg(cloud=input_cloud)
+    def segment_scene(self,input_cloud,robot_pos=None):
+
+        if(robot_pos is None):
+            rospy.wait_for_service('/get_closest_roi_to_robot',10)
+            roicl = rospy.ServiceProxy('/get_closest_roi_to_robot',GetROIClosestToRobot)
+            rp = rospy.wait_for_message("/robot_pose",Pose,10)
+            roip = roicl(pose=rp.position)
+            robot_pos = roip.output
+
+
+        output = self.segmentation_service(cloud=input_cloud,posearray=robot_pos)
+        return output
 
 
     def add_unsegmented_scene(self,observation_data,offline_data=None):
@@ -611,7 +613,10 @@ class SegmentProcessor:
         rospy.loginfo("filtering this cloud by SOMA ROI")
         rospy.loginfo("segmenting (may take a second)")
 
-        segment_response = self.segment_scene(observation_data['scene_cloud'])
+        robot_pos = None
+        if(offline_data is not None):
+            robot_pos = offline_data['robot_pose']
+        segment_response = self.segment_scene(observation_data['scene_cloud'],robot_pos)
 
         # this might be different to what is in the raw observation message
         # as we may do things like cut it off after a certain distance etc.

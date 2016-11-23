@@ -41,6 +41,7 @@ class ROIFilter:
         self.gather_rois()
 
     def get_closest_roi_to_robot_cb(self, req):
+        rospy.loginfo("got robot roi req")
         p = self.get_closest_roi_to_robot(req.pose)
         return GetROIClosestToRobotResponse(p)
 
@@ -83,7 +84,7 @@ class ROIFilter:
 
                 points = roi.posearray.poses
 
-		print("found roi type:" + roi.type)
+                print("found roi type:" + roi.type)
 
                 print(roi.type)
                 points_2d = []
@@ -115,9 +116,33 @@ class ROIFilter:
 
 
 
+        # TODO: Expand this later to support proper polygons
     def get_closest_roi_to_robot(self,filter_point):
+        rospy.loginfo("executing robot roi req")
         self.gather_rois(filter_point)
-        return self.soma_polygons[0]
+        poly = self.soma_polygons[0]
+        pa = geometry_msgs.msg.PoseArray()
+        min_x = poly.bounds[0]
+        min_y = poly.bounds[1]
+        max_x = poly.bounds[2]
+        max_y = poly.bounds[3]
+
+        mn = geometry_msgs.msg.Pose()
+        mn.position.x = min_x
+        mn.position.y = min_y
+
+        mx = geometry_msgs.msg.Pose()
+        mx.position.x = max_x
+        mx.position.y = max_y
+
+        pa.poses.append(mn)
+        pa.poses.append(mx)
+        rospy.loginfo("returning pa:")
+        rospy.loginfo(pa)
+        return pa
+
+
+
 
 
     def get_points_in_rois(self,point_set):
