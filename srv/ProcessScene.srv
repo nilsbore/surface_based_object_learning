@@ -1,5 +1,6 @@
 sensor_msgs/PointCloud2 input     # the input point cloud
 string waypoint     # the waypoint of the observation
+bool just_data_collection  # determines if we will fully process observations (segmentation,alignment etc.) or just collect and publish scenes without processing
 ---
 bool result         # whether the service succeded or failed
 string[] objects   # IDs of all SOMA objects present in this view

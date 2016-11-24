@@ -54,6 +54,8 @@ class LearningCore:
         self.cur_view_soma_ids = []
         self.cur_observation_data = None
         self.queued_soma_objs = []
+        self.cur_scene_list = []
+        self.just_data_collection = False
 
         rospy.loginfo("LEARNING CORE: setting up services")
         process = rospy.Service('/surface_based_object_learning/process_scene',ProcessScene,self.process_scene_callback)
@@ -95,6 +97,8 @@ class LearningCore:
         rospy.wait_for_service('/soma_llsd/add_observations_to_segment')
         self.append_obs_to_segment = rospy.ServiceProxy('/soma_llsd/add_observations_to_segment',AddObservationsToSegment)
 
+        self.scene_publisher = rospy.Publisher('/surface_based_object_learning/scenes', std_msgs.msg.String, queue_size=10)
+
         self.clean_up_obs()
 
         rospy.loginfo("LEARNING CORE: -- node setup completed --")
@@ -109,7 +113,9 @@ class LearningCore:
         self.pending_obs = []
         self.cur_sequence_obj_ids = []
         self.cur_view_soma_ids = []
+        self.cur_scene_list = []
         self.cur_observation_data = None
+        self.just_data_collection = False
         self.segment_processor.reset()
         self.cur_episode_id = str(uuid.uuid4())
         self.queued_soma_objs = []
@@ -161,11 +167,10 @@ class LearningCore:
             if(self.cur_observation_data is None):
                 self.populate_observation_data(cloud,extra_data)
 
-
             # INSERT INTO THE VIEW STORE
             scene = self.view_store_insert(self.cur_episode_id,
             self.cur_observation_data['waypoint'],
-            "{}", # meta_data
+            self.cur_observation_data['metadata'], # meta_data
             self.cur_observation_data['timestamp'],
             self.cur_observation_data['tf'],
             self.cur_observation_data['scene_cloud'],
@@ -177,6 +182,7 @@ class LearningCore:
             if(scene.result is True):
                 rospy.loginfo("LEARNING CORE: successfully added scene to view store")
                 self.cur_scene_id = scene.response.id
+                self.cur_scene_list.append(self.cur_scene_id)
             else:
                 rospy.logerr("couldn't add scene to view store, this is catastrophic")
 
@@ -186,39 +192,44 @@ class LearningCore:
 
 
     def process_scene(self,cloud,waypoint,extra_data=None):
-        #try:
-        rospy.loginfo("LEARNING CORE: ---- Storing view in View Store ----")
-        self.cur_waypoint = waypoint
-        self.populate_observation_data(cloud,extra_data)
-        self.register_with_view_store(cloud)
+        try:
+            rospy.loginfo("LEARNING CORE: ---- Storing view in View Store ----")
+            self.cur_waypoint = waypoint
+            self.populate_observation_data(cloud,extra_data)
+            self.register_with_view_store(cloud)
+
+            # if we're just doing data collection, no need to do any more processing
+            if(self.just_data_collection is True):
+                rospy.loginfo("In data collection mode, so not doing any more processing.")
+                return ProcessSceneResponse(True,self.cur_view_soma_ids)
+                return
 
 
-        rospy.loginfo("LEARNING CORE: ---- Segmenting Scene ----")
-        scene = self.segment_processor.add_unsegmented_scene(self.cur_observation_data,extra_data)
-        if(scene.clean_setup is True):
+            rospy.loginfo("LEARNING CORE: ---- Segmenting Scene ----")
+            scene = self.segment_processor.add_unsegmented_scene(self.cur_observation_data,extra_data)
+            if(scene.clean_setup is True):
 
-            scene.waypoint = waypoint
+                scene.waypoint = waypoint
 
-            #if(self.recog_manager):
-            #    rospy.loginfo("LEARNING CORE: ---- Running Object Recognition ----")
-            #    recognition = self.recog_manager.recognise_scene(cloud)
-            #    if(recognition is True):
-            #        self.recog_manager.assign_labels(scene)
-            #else:
-            #    rospy.logwarn("Object recognition service not found, try restarting is the node running?")
+                #if(self.recog_manager):
+                #    rospy.loginfo("LEARNING CORE: ---- Running Object Recognition ----")
+                #    recognition = self.recog_manager.recognise_scene(cloud)
+                #    if(recognition is True):
+                #        self.recog_manager.assign_labels(scene)
+                #else:
+                #    rospy.logwarn("Object recognition service not found, try restarting is the node running?")
 
-            self.assign_segments(scene,self.segment_processor.prev_scene,extra_data)
-            self.pending_obs.append(scene)
+                self.assign_segments(scene,self.segment_processor.prev_scene,extra_data)
+                self.pending_obs.append(scene)
 
-            rospy.loginfo("LEARNING CORE: have: " + str(len(self.pending_obs)) + " view(s) waiting to be processed")
+                rospy.loginfo("LEARNING CORE: have: " + str(len(self.pending_obs)) + " view(s) waiting to be processed")
 
-            return ProcessSceneResponse(True,self.cur_view_soma_ids)
-        else:
-            rospy.loginfo("LEARNING CORE: Error in processing scene")
-
-        #except Exception,e:
-        #    rospy.logerr("Unable to segment and process this scene")
-        #    rospy.logerr(e)
+                return ProcessSceneResponse(True,self.cur_view_soma_ids)
+            else:
+                rospy.loginfo("LEARNING CORE: Error in processing scene")
+        except Exception,e:
+            rospy.logerr("Unable to segment and process this scene")
+            rospy.logerr(e)
 
     def process_scene_callback(self, req):
         result = ProcessSceneResponse(False,self.cur_view_soma_ids)
@@ -233,64 +244,86 @@ class LearningCore:
                 rospy.logwarn("-- Stopping Processing ---")
                 return result
 
+            self.just_data_collection = req.just_data_collection
+
+            if(self.just_data_collection):
+                rospy.loginfo("Running in data collection mode")
+            else:
+                rospy.loginfo("Running in full process")
+
             result = self.process_scene(req.input,req.waypoint)
 
             return result
 
     def do_postprocessing(self):
-        rospy.loginfo("LEARNING CORE: -- beginning post-processing, attempting view alignment and object label updates -- ")
+        try:
+            rospy.loginfo("LEARNING CORE: -- beginning post-processing, attempting view alignment and object label updates -- ")
 
-        if(self.queued_soma_objs):
-            rospy.loginfo("-- inserting " + str(len(self.queued_soma_objs)) + " objects into soma")
-            for k in self.queued_soma_objs:
-                print(k.id)
-            res = self.soma_insert(self.queued_soma_objs)
-            print(res)
+            if(self.just_data_collection):
+                rospy.loginfo("In data collection mode, so just publishing the IDs of the scenes I have observed")
+                rospy.loginfo("Publishing " + str(len(self.cur_scene_list)) + " scenes to /surface_based_object_learning/observed_scenes")
+                for k in self.cur_scene_list:
+                    self.scene_publisher.publish(k)
+                    rospy.sleep(1)
+            return
 
 
-        if(len(self.cur_sequence_obj_ids) == 0):
-            rospy.loginfo("LEARNING CORE: -- no segments found in this scene, or if they were they were filtered out by the SOMA region or height filters ")
+            if(self.queued_soma_objs):
+                rospy.loginfo("-- inserting " + str(len(self.queued_soma_objs)) + " objects into soma")
+                for k in self.queued_soma_objs:
+                    print(k.id)
+                res = self.soma_insert(self.queued_soma_objs)
+                print(res)
 
-        for object_id in self.cur_sequence_obj_ids:
-            rospy.loginfo("trying to get soma id: " + object_id)
-            soma_object = self.get_soma_objects_with_id(object_id)
-            rospy.loginfo("trying to get segment:-" + object_id+"-")
-            segment = self.get_segment(object_id)
-            if(segment.result is False):
-                rospy.logerr("Could not access low-level data for object")
-                rospy.logerr("This is catastrophic")
-                continue
-            rospy.loginfo("done")
 
-            observations = segment.response.observations
-            rospy.loginfo("LEARNING CORE: observations for " + str(object_id) + " = " + str(len(observations)))
-            if(len(observations) >= 2):
-                rospy.loginfo("LEARNING CORE: processing...")
-                # update world model
-                try:
-                    rospy.loginfo("LEARNING CORE: updating world model")
-                    merged_cloud = self.view_alignment_manager.register_views(segment.response.observations)
-                    rospy.loginfo("LEARNING CORE: updating SOMA obj")
-                    soma_object.objects[0].cloud = merged_cloud
+            if(len(self.cur_sequence_obj_ids) == 0):
+                rospy.loginfo("LEARNING CORE: -- no segments found in this scene, or if they were they were filtered out by the SOMA region or height filters ")
 
-                    self.soma_update(object=soma_object.objects[0],db_id=str(object_id))
-                except Exception,e:
-                    rospy.logerr("problem updating object models in world/SOMA db. Unable to register merged clouds")
-                    rospy.logerr(e)
+            for object_id in self.cur_sequence_obj_ids:
+                rospy.loginfo("trying to get soma id: " + object_id)
+                soma_object = self.get_soma_objects_with_id(object_id)
+                rospy.loginfo("trying to get segment:-" + object_id+"-")
+                segment = self.get_segment(object_id)
+                if(segment.result is False):
+                    rospy.logerr("Could not access low-level data for object")
+                    rospy.logerr("This is catastrophic")
                     continue
-            else:
-                rospy.loginfo("LEARNING CORE: not running view alignment, only one view")
+                rospy.loginfo("done")
 
-            #rospy.loginfo("LEARNING CORE: attempting to update object's recognition label")
-            #try:
-            #    soma_objects.objects[0].type = str(world_object.label)
-            #    self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
-            #    rospy.loginfo("LEARNING CORE: done! this object recognised as a " + str(world_object.label) + " with confidence: " + str(world_object.label_confidence))
-            #except Exception,e:
-            #    rospy.logerr("Problem updating SOMA object label.")
-            #    rospy.logerr(e)
+                observations = segment.response.observations
+                rospy.loginfo("LEARNING CORE: observations for " + str(object_id) + " = " + str(len(observations)))
+                if(len(observations) >= 2):
+                    rospy.loginfo("LEARNING CORE: processing...")
+                    # update world model
+                    try:
+                        rospy.loginfo("LEARNING CORE: updating world model")
+                        merged_cloud = self.view_alignment_manager.register_views(segment.response.observations)
+                        rospy.loginfo("LEARNING CORE: updating SOMA obj")
+                        soma_object.objects[0].cloud = merged_cloud
 
-        rospy.loginfo("LEARNING CORE: post-processing complete")
+                        self.soma_update(object=soma_object.objects[0],db_id=str(object_id))
+                    except Exception,e:
+                        rospy.logerr("problem updating object models in world/SOMA db. Unable to register merged clouds")
+                        rospy.logerr(e)
+                        continue
+                else:
+                    rospy.loginfo("LEARNING CORE: not running view alignment, only one view")
+
+                #rospy.loginfo("LEARNING CORE: attempting to update object's recognition label")
+                #try:
+                #    soma_objects.objects[0].type = str(world_object.label)
+                #    self.soma_update(object=soma_objects.objects[0],db_id=str(object_id))
+                #    rospy.loginfo("LEARNING CORE: done! this object recognised as a " + str(world_object.label) + " with confidence: " + str(world_object.label_confidence))
+                #except Exception,e:
+                #    rospy.logerr("Problem updating SOMA object label.")
+                #    rospy.logerr(e)
+
+            rospy.loginfo("LEARNING CORE: post-processing complete")
+        except Exception,e:
+            rospy.logerr("Failed at post-processing step")
+            rospy.logerr(e)
+            rospy.logerr("Abandoning and attempting to clean up")
+            self.clean_up_obs()
 
 
     def add_soma_object(self,obj):
@@ -325,6 +358,20 @@ class LearningCore:
                 self.cur_observation_data['waypoint'] = self.cur_waypoint
                 self.cur_observation_data['timestamp'] = int(rospy.Time.now().to_sec())
                 self.cur_observation_data['robot_pose'] = rospy.wait_for_message("/robot_pose", geometry_msgs.msg.Pose, timeout=10.0)
+
+
+                meta_data = "{}"
+                data_dict = {}
+                if(self.just_data_collection):
+                    data_dict["source"] = "surface_based_object_learning"
+                    meta_data = json.dumps(data_dict)
+                else:
+                    data_dict["source"] = "dynamic_cluster_observations"
+                    meta_data = json.dumps(data_dict)
+
+                self.cur_observation_data['metadata'] = meta_data
+
+
 
                 # populates the tf entry with a few seconds worth of tf data
                 listener = TransformationStore()
