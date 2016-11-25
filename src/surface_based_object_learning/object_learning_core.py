@@ -261,10 +261,11 @@ class LearningCore:
 
             if(self.just_data_collection):
                 rospy.loginfo("In data collection mode, so just publishing the IDs of the scenes I have observed")
-                rospy.loginfo("Publishing " + str(len(self.cur_scene_list)) + " scenes to /surface_based_object_learning/observed_scenes")
+                rospy.loginfo("Publishing " + str(len(self.cur_scene_list)) + " scenes to /surface_based_object_learning/scenes")
+                rospy.Rate(10) # 10hz
                 for k in self.cur_scene_list:
                     self.scene_publisher.publish(k)
-                    rospy.sleep(1)
+                self.scene_publisher.publish("done")
             return
 
 
@@ -363,10 +364,10 @@ class LearningCore:
                 meta_data = "{}"
                 data_dict = {}
                 if(self.just_data_collection):
-                    data_dict["source"] = "surface_based_object_learning"
+                    data_dict["source"] = "dynamic_cluster_observations"
                     meta_data = json.dumps(data_dict)
                 else:
-                    data_dict["source"] = "dynamic_cluster_observations"
+                    data_dict["source"] = "surface_based_object_learning"
                     meta_data = json.dumps(data_dict)
 
                 self.cur_observation_data['metadata'] = meta_data
