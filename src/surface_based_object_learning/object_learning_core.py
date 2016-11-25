@@ -266,7 +266,7 @@ class LearningCore:
                 for k in self.cur_scene_list:
                     self.scene_publisher.publish(k)
                 self.scene_publisher.publish("done")
-            return
+                return
 
 
             if(self.queued_soma_objs):
