@@ -82,7 +82,7 @@ class OctomapSimilarityTrackerStrategy(ClusterTrackingStrategy):
             if(best_segment is None):
                 rospy.loginfo("Unable to find a segment that is appropriate for linking")
             else:
-                if(best_score < 25):
+                if(best_score < 0.25):
                     rospy.loginfo("The best looking segment has overlap below the score threshold, so I won't link it")
                     continue
                 best_segment.assigned = True

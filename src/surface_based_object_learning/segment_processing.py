@@ -147,6 +147,7 @@ class SegmentedScene:
             points_out.append([p_out[0],p_out[1],p_out[2],p_in[3]])
 
         res = pc2.create_cloud(cloud.header, cloud.fields, points_out)
+        rospy.loginfo("done")
         return res
 
     def set_frames(self,cloud):
@@ -228,6 +229,7 @@ class SegmentedScene:
             map_points_data = []
             image_mask = np.zeros(cv_rgb_image.shape,np.uint8)
 
+            rospy.loginfo("CLUSTER SIZE: " + str(len(root_segment.data)))
             if(len(root_segment.data) > 500 and len(root_segment.data) < 5000):
                 rospy.loginfo("cluster looks like the right size")
             else:
@@ -419,6 +421,7 @@ class SegmentedScene:
             header_map.stamp = rospy.Time.now()
             header_map.frame_id = 'map'
             cur_segment.segmented_pc_mapframe = pc2.create_cloud(header_map, to_map.fields, map_points_data)
+            rospy.loginfo("segment has: " + str(len(map_points_data)) + " points")
 
             rospy.loginfo("map centroid:" + str(cur_segment.map_centroid))
 
