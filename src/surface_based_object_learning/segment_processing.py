@@ -620,6 +620,8 @@ class SegmentProcessor:
         if(offline_data is not None):
             robot_pos = offline_data['robot_pose']
         segment_response = self.segment_scene(observation_data['scene_cloud'],robot_pos)
+        if(segment_response.clusters_indices is None):
+            rospy.logerr("No indices in segmented point cloud. Quitting processing this view.")
 
         # this might be different to what is in the raw observation message
         # as we may do things like cut it off after a certain distance etc.
