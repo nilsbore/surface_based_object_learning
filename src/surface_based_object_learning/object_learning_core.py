@@ -354,7 +354,7 @@ class LearningCore:
             try:
                 self.camera_info_topic = self.get_camera_info_topic()
                 self.cur_observation_data['rgb_image'] = rospy.wait_for_message("/head_xtion/rgb/image_color", Image, timeout=10.0)
-                self.cur_observation_data['depth_image'] = rospy.wait_for_message("/head_xtion/depth/image_raw", Image, timeout=10.0)
+                self.cur_observation_data['depth_image'] = rospy.wait_for_message("/head_xtion/depth/image", Image, timeout=10.0)
                 self.cur_observation_data['camera_info'] = rospy.wait_for_message(self.camera_info_topic, CameraInfo, timeout=10.0)
                 self.cur_observation_data['scene_cloud'] = scene
                 self.cur_observation_data['waypoint'] = self.cur_waypoint
