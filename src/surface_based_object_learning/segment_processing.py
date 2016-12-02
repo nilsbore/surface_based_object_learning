@@ -666,7 +666,7 @@ if __name__ == '__main__':
 
     cur_observation_data = {}
     cur_observation_data['rgb_image'] = rospy.wait_for_message("/head_xtion/rgb/image_rect_color", Image, timeout=10.0)
-    cur_observation_data['depth_image'] = rospy.wait_for_message("/head_xtion/depth/image_rect", Image, timeout=10.0)
+    cur_observation_data['depth_image'] = rospy.wait_for_message("/head_xtion/depth/image", Image, timeout=10.0)
     cur_observation_data['camera_info'] = rospy.wait_for_message("/head_xtion/depth/camera_info", CameraInfo, timeout=10.0)
     cur_observation_data['scene_cloud'] = rospy.wait_for_message("/head_xtion/depth_registered/points",PointCloud2,timeout=10.0)
     cur_observation_data['waypoint'] = "MY HOUSE"
