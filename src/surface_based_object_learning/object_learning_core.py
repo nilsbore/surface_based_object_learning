@@ -164,6 +164,7 @@ class LearningCore:
 
     def register_with_view_store(self,cloud,extra_data=None):
         try:
+            # used in the case of offline data
             if(self.cur_observation_data is None):
                 self.populate_observation_data(cloud,extra_data)
 
@@ -186,9 +187,11 @@ class LearningCore:
             else:
                 rospy.logerr("couldn't add scene to view store, this is catastrophic")
 
+            return True
         except Exception,e:
             rospy.loginfo(e)
             rospy.loginfo("LEARNING CORE: failed to add view to view store")
+            return False
 
 
     def process_scene(self,cloud,waypoint,extra_data=None):
@@ -196,7 +199,10 @@ class LearningCore:
             rospy.loginfo("LEARNING CORE: ---- Storing view in View Store ----")
             self.cur_waypoint = waypoint
             self.populate_observation_data(cloud,extra_data)
-            self.register_with_view_store(cloud)
+            success = self.register_with_view_store(cloud)
+            if not success:
+                rospy.logerr("Data collection failed for some reason. See above.")
+                return ProcessSceneResponse(False,self.cur_view_soma_ids)
 
             # if we're just doing data collection, no need to do any more processing
             if(self.just_data_collection is True):
@@ -386,6 +392,7 @@ class LearningCore:
             except rospy.ROSException, e:
                 rospy.logwarn("Failed to get some observation data")
                 rospy.logwarn(e)
+                return None
         else:
                 rospy.loginfo("LEARNING CORE: *** Making observation using historic robot data")
                 self.cur_observation_data['rgb_image'] = extra_data['rgb_image']

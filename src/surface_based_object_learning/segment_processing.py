@@ -497,7 +497,7 @@ class SegmentedScene:
 
             cur_segment.image_mask = bridge.cv2_to_imgmsg(image_mask)
 
-            #cv2.imwrite(str(uuid.uuid4())+'_mask.png',image_mask)
+            cv2.imwrite(str(uuid.uuid4())+'_mask.png',image_mask)
 
 
 
