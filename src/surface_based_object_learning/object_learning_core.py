@@ -234,8 +234,9 @@ class LearningCore:
             else:
                 rospy.loginfo("LEARNING CORE: Error in processing scene")
         except Exception,e:
-            rospy.logerr("Unable to segment and process this scene")
+            rospy.logerr("Unable to segment and process this scene -- see the issues above. This may be fine")
             rospy.logerr(e)
+            return ProcessSceneResponse(False,self.cur_view_soma_ids)
 
     def process_scene_callback(self, req):
         rospy.loginfo("-- Received instruction to process a scene")
