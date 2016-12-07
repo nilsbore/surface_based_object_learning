@@ -26,13 +26,14 @@ if __name__ == '__main__':
     processed_episodes = []
     for sc in scenes:
         cur_scene = sc[0]
-        print("processing: " + cur_scene.id)
-        if not os.path.exists(targ+cur_scene.episode_id+"/"):
-            os.makedirs(targ+cur_scene.episode_id+"/")
-        if(cur_scene.episode_id not in processed_episodes):
-            processed_episodes.append(cur_scene.episode_id)
-        scene_count+=1
-        pickle.dump(cur_scene,open(targ+cur_scene.episode_id+"/"+cur_scene.id+".p",'wb'))
+        if "surface" in sc.meta:
+            print("processing: " + cur_scene.id)
+            if not os.path.exists(targ+cur_scene.episode_id+"/"):
+                os.makedirs(targ+cur_scene.episode_id+"/")
+            if(cur_scene.episode_id not in processed_episodes):
+                processed_episodes.append(cur_scene.episode_id)
+            scene_count+=1
+            pickle.dump(cur_scene,open(targ+cur_scene.episode_id+"/"+cur_scene.id+".p",'wb'))
 
 
     print("processed: " + str(scene_count) + " scenes and " + str(len(processed_episodes)) + " episodes")

@@ -66,21 +66,10 @@ class ROIFilter:
         visited_ids = []
         #rospy.loginfo("ROI TYPES: ")
         for roi in response.rois:
-            if(roi.id not in visited_ids):
+            if(roi.id not in visited_ids and "1611" in roi.config and "Common" in roi.type):
                 visited_ids.append(roi.id)
-                #rospy.loginfo(roi.type)
-                if("NavArea" in roi.type):
-                #rospy.loginfo(roi.type+" \t SKIPPING")
-                    continue
-                if("Human" in roi.type):
-                #rospy.loginfo(roi.type+" \t SKIPPING")
-                    continue
-
-                if("Robot" in roi.type):
-                    continue
-
-                if("Atrium" in roi.type):
-                    continue
+                rospy.loginfo(roi.type)
+                rospy.loginfo(roi.config)
 
                 points = roi.posearray.poses
 
@@ -99,6 +88,7 @@ class ROIFilter:
                 polygon = Polygon(points_2d)
                 print(polygon)
                 self.soma_polygons.append(polygon)
+        rospy.loginfo("located: " + str(len(self.soma_polygons)) + " rois")
 
         if(filter_point is not None):
             filter_point = shapely.geometry.Point(filter_point.x,filter_point.y)
@@ -289,10 +279,3 @@ if __name__ == '__main__':
     rospy.init_node('test_roi_filter_', anonymous = True)
     rospy.loginfo("loading ROI Filter")
     r = ROIFilter()
-    print("getting pose closest to robot")
-    pose = rospy.wait_for_message("/robot_pose", geometry_msgs.msg.Pose, timeout=10.0)
-    print("position:")
-    print(pose)
-    roi = r.get_closest_roi_to_robot(pose.position)
-    print("done")
-    print(roi)
