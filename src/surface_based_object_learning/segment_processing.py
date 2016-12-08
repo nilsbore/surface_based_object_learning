@@ -230,7 +230,7 @@ class SegmentedScene:
             image_mask = np.zeros(cv_rgb_image.shape,np.uint8)
 
             rospy.loginfo("CLUSTER SIZE: " + str(len(root_segment.data)))
-            if(len(root_segment.data) > 500 and len(root_segment.data) < 5000):
+            if(len(root_segment.data) >= 200 and len(root_segment.data) < 15000):
                 rospy.loginfo("cluster looks like the right size")
             else:
                 rospy.loginfo("cluster not the right size")

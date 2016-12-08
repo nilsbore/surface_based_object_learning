@@ -208,7 +208,7 @@ class LearningCore:
             if(self.just_data_collection is True):
                 rospy.loginfo("In data collection mode, so not doing any more processing.")
                 return ProcessSceneResponse(True,self.cur_view_soma_ids)
-                return
+                #return
 
 
             rospy.loginfo("LEARNING CORE: ---- Segmenting Scene ----")
