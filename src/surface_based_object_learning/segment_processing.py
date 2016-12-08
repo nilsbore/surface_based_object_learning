@@ -456,7 +456,7 @@ class SegmentedScene:
             #if(bbox_width > b_h):
             #    b_h = bbox_width
 
-            padding = 32
+            padding = 48
 
             cur_segment.cv_rgb_image_cropped_unpadded = cv_rgb_image[int(rgb_min_y):int(rgb_max_y), int(rgb_min_x):int(rgb_max_x)]
 
