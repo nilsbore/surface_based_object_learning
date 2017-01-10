@@ -380,8 +380,8 @@ class LearningCore:
                     pose_msg.orientation.x = rot[0]
                     pose_msg.orientation.y = rot[1]
                     pose_msg.orientation.z = rot[2]
-                    pose_msg.orientation.z = rot[3]
-                    robot_pose = pose_msg
+                    pose_msg.orientation.w = rot[3]
+                    self.cur_observation_data['robot_pose'] = pose_msg
                 except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                     rospy.logerr("Could not get TF transform from /map to %s" % scene.header.frame_id)
 
