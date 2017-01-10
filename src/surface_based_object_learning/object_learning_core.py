@@ -99,6 +99,8 @@ class LearningCore:
 
         self.scene_publisher = rospy.Publisher('/surface_based_object_learning/scenes', std_msgs.msg.String, queue_size=10)
 
+        self.tf_listener = tf.TransformListener()
+
         self.clean_up_obs()
 
         rospy.loginfo("LEARNING CORE: -- node setup completed --")
@@ -368,6 +370,20 @@ class LearningCore:
                 self.cur_observation_data['timestamp'] = int(rospy.Time.now().to_sec())
                 self.cur_observation_data['robot_pose'] = rospy.wait_for_message("/robot_pose", geometry_msgs.msg.Pose, timeout=10.0)
 
+                try:
+                    self.tf_listener.waitForTransform(scene.header.frame_id, '/map', scene.header.stamp, rospy.Duration(0.1))¶
+                    (trans, rot) = self.tf_listener.lookupTransform(scene.header.frame_id, '/map', scene.header.stamp)
+                    pose_msg = Pose()
+                    pose_msg.position.x = trans[0]
+                    pose_msg.position.y = trans[1]
+                    pose_msg.position.z = trans[2]
+                    pose_msg.orientation.x = rot[0]
+                    pose_msg.orientation.y = rot[1]
+                    pose_msg.orientation.z = rot[2]
+                    pose_msg.orientation.z = rot[3]
+                    robot_pose = pose_msg
+                except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                    rospy.logerr("Could not get TF transform from /map to %s" % scene.header.frame_id)
 
                 meta_data = "{}"
                 data_dict = {}
