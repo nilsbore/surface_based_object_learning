@@ -371,7 +371,7 @@ class LearningCore:
                 self.cur_observation_data['robot_pose'] = rospy.wait_for_message("/robot_pose", geometry_msgs.msg.Pose, timeout=10.0)
 
                 try:
-                    self.tf_listener.waitForTransform(scene.header.frame_id, '/map', scene.header.stamp, rospy.Duration(0.1))¶
+                    self.tf_listener.waitForTransform('/map', scene.header.frame_id, scene.header.stamp, rospy.Duration(0.1))¶
                     (trans, rot) = self.tf_listener.lookupTransform(scene.header.frame_id, '/map', scene.header.stamp)
                     pose_msg = Pose()
                     pose_msg.position.x = trans[0]
